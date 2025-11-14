@@ -51,3 +51,84 @@ oauth:
     await expect(loader.load()).rejects.toThrow(/YAML/);
   });
 });
+
+describe('ConfigLoader Environment Overrides', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = join(tmpdir(), `config-test-${Date.now()}`);
+    mkdirSync(tempDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+    // Clean up env vars
+    delete process.env.CC_WRAPPER_CLAUDE_PATH;
+    delete process.env.CC_WRAPPER_OAUTH_CLIENT_ID;
+    delete process.env.CC_WRAPPER_REFRESH_THRESHOLD;
+  });
+
+  it('should override claudePath from env', async () => {
+    const configPath = join(tempDir, 'config.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /default/path
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: default-client
+`
+    );
+
+    process.env.CC_WRAPPER_CLAUDE_PATH = '/env/override/path';
+
+    const loader = new ConfigLoader(configPath);
+    const config = await loader.load();
+
+    expect(config.claudePath).toBe('/env/override/path');
+  });
+
+  it('should override oauth clientId from env', async () => {
+    const configPath = join(tempDir, 'config.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: default-client
+`
+    );
+
+    process.env.CC_WRAPPER_OAUTH_CLIENT_ID = 'env-client';
+
+    const loader = new ConfigLoader(configPath);
+    const config = await loader.load();
+
+    expect(config.oauth.clientId).toBe('env-client');
+  });
+
+  it('should merge env overrides with file config', async () => {
+    const configPath = join(tempDir, 'config.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: file-client
+refreshThreshold: 600
+`
+    );
+
+    process.env.CC_WRAPPER_REFRESH_THRESHOLD = '120';
+
+    const loader = new ConfigLoader(configPath);
+    const config = await loader.load();
+
+    expect(config.refreshThreshold).toBe(120);
+    expect(config.oauth.clientId).toBe('file-client'); // unchanged
+  });
+});
