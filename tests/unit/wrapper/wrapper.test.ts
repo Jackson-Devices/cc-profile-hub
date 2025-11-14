@@ -28,5 +28,25 @@ describe('ClaudeWrapper', () => {
         expect.any(Object)
       );
     });
+
+    it('should preserve exit code from claude process', async () => {
+      const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
+      const mockProcess = {
+        on: jest.fn((event: string, callback: (code: number) => void) => {
+          if (event === 'exit') {
+            callback(42); // Non-zero exit
+          }
+          return mockProcess;
+        }),
+        kill: jest.fn(),
+      } as any;
+
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const wrapper = new ClaudeWrapper();
+      const exitCode = await wrapper.run(['invalid-command']);
+
+      expect(exitCode).toBe(42);
+    });
   });
 });
