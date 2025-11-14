@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import pino from 'pino';
+import { DEFAULT_REDACTION_PATHS } from './redactionPaths';
 
 export interface LoggerOptions {
   level: 'trace' | 'debug' | 'info' | 'warn' | 'error';
@@ -10,10 +11,12 @@ export class Logger {
   private pino: pino.Logger;
 
   constructor(options: LoggerOptions) {
+    const redactPaths = options.redactPaths || DEFAULT_REDACTION_PATHS;
+
     this.pino = pino({
       level: options.level,
       redact: {
-        paths: options.redactPaths || [],
+        paths: redactPaths,
         censor: '[REDACTED]',
       },
     });
