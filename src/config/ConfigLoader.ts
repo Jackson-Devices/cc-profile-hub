@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { load as parseYaml } from 'js-yaml';
 import { Config } from './Config';
+import { applyEnvOverrides } from './envOverrides';
 
 export class ConfigLoader {
   constructor(private configPath: string) {}
@@ -24,7 +25,10 @@ export class ConfigLoader {
       throw new Error(`Invalid YAML in config file: ${error.message}`);
     }
 
-    const validated = Config.validate(parsed);
+    // Apply environment overrides
+    const withOverrides = applyEnvOverrides(parsed);
+
+    const validated = Config.validate(withOverrides);
     return new Config(validated);
   }
 }
