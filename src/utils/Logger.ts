@@ -1,11 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import pino from 'pino';
+import { randomBytes } from 'crypto';
 import { DEFAULT_REDACTION_PATHS } from './redactionPaths';
 import { ILogger } from './ILogger';
 
 export interface LoggerOptions {
   level: 'trace' | 'debug' | 'info' | 'warn' | 'error';
   redactPaths?: string[];
+  requestId?: string;
+  generateRequestId?: boolean;
 }
 
 export class Logger implements ILogger {
@@ -14,13 +17,29 @@ export class Logger implements ILogger {
   constructor(options: LoggerOptions) {
     const redactPaths = options.redactPaths || DEFAULT_REDACTION_PATHS;
 
+    // Determine requestId
+    let requestId: string | undefined;
+    if (options.requestId) {
+      requestId = options.requestId;
+    } else if (options.generateRequestId) {
+      requestId = this.generateRequestId();
+    }
+
     this.pino = pino({
       level: options.level,
       redact: {
         paths: redactPaths,
         censor: '[REDACTED]',
       },
+      ...(requestId && { base: { requestId } }),
     });
+  }
+
+  /**
+   * Generate a unique request ID.
+   */
+  private generateRequestId(): string {
+    return randomBytes(16).toString('hex');
   }
 
   child(bindings: Record<string, any>): ILogger {
