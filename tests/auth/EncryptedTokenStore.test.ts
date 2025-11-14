@@ -107,3 +107,95 @@ describe('EncryptedTokenStore', () => {
     expect(result).toEqual(tokenData);
   });
 });
+
+describe('EncryptedTokenStore Corruption Recovery', () => {
+  let tempDir: string;
+  let store: EncryptedTokenStore;
+  const passphrase = 'test-passphrase-123';
+
+  beforeEach(() => {
+    tempDir = join(tmpdir(), `corruption-test-${Date.now()}`);
+    mkdirSync(tempDir, { recursive: true });
+    store = new EncryptedTokenStore(tempDir, passphrase);
+  });
+
+  afterEach(() => {
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should handle corrupted encrypted file gracefully', async () => {
+    const profileId = 'corrupted-encrypted';
+    const filePath = join(tempDir, `${profileId}.token.json`);
+
+    // Write corrupted encrypted data
+    const corruptedData = JSON.stringify({ encrypted: 'invalid-base64-data!!!' });
+    require('fs').writeFileSync(filePath, corruptedData);
+
+    const result = await store.read(profileId);
+    expect(result).toBeNull();
+  });
+
+  it('should handle malformed JSON gracefully', async () => {
+    const profileId = 'malformed-json';
+    const filePath = join(tempDir, `${profileId}.token.json`);
+
+    // Write malformed JSON
+    require('fs').writeFileSync(filePath, '{ invalid json content }');
+
+    const result = await store.read(profileId);
+    expect(result).toBeNull();
+  });
+
+  it('should handle truncated encrypted file', async () => {
+    const profileId = 'truncated';
+    const tokenData: TokenData = {
+      accessToken: 'test-access',
+      refreshToken: 'test-refresh',
+      expiresAt: Date.now() + 3600000,
+      grantedAt: Date.now(),
+      scopes: ['user:inference'],
+      tokenType: 'Bearer',
+      deviceFingerprint: 'device-123',
+    };
+
+    // Write valid token first
+    await store.write(profileId, tokenData);
+
+    // Corrupt the file by truncating it
+    const filePath = join(tempDir, `${profileId}.token.json`);
+    const content = readFileSync(filePath, 'utf-8');
+    const truncated = content.slice(0, content.length / 2);
+    require('fs').writeFileSync(filePath, truncated);
+
+    const result = await store.read(profileId);
+    expect(result).toBeNull();
+  });
+
+  it('should recover from leftover temp files on next write', async () => {
+    const profileId = 'temp-recovery';
+    const filePath = join(tempDir, `${profileId}.token.json`);
+    const tempPath = join(tempDir, `${profileId}.token.json.tmp`);
+
+    // Simulate leftover temp file from crashed write
+    const tempData = JSON.stringify({ encrypted: 'old-temp-data' });
+    require('fs').writeFileSync(tempPath, tempData);
+
+    // Write new data - should succeed and overwrite temp file
+    const tokenData: TokenData = {
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
+      expiresAt: Date.now() + 3600000,
+      grantedAt: Date.now(),
+      scopes: ['user:inference'],
+      tokenType: 'Bearer',
+      deviceFingerprint: 'device-123',
+    };
+
+    await store.write(profileId, tokenData);
+    const result = await store.read(profileId);
+
+    expect(result).toEqual(tokenData);
+  });
+});
