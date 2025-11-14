@@ -49,4 +49,60 @@ describe('ClaudeWrapper', () => {
       expect(exitCode).toBe(42);
     });
   });
+
+  describe('Signal Handling', () => {
+    it('should forward SIGINT to claude process', async () => {
+      const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
+      const mockKill = jest.fn();
+      const mockProcess = {
+        on: jest.fn(),
+        kill: mockKill,
+      } as any;
+
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const wrapper = new ClaudeWrapper();
+      const runPromise = wrapper.run(['--version']);
+
+      // Simulate SIGINT after spawn
+      process.emit('SIGINT' as any);
+
+      expect(mockKill).toHaveBeenCalledWith('SIGINT');
+
+      // Trigger exit to complete the promise
+      const exitCallback = mockProcess.on.mock.calls.find(
+        (call: any) => call[0] === 'exit'
+      )?.[1];
+      if (exitCallback) exitCallback(0);
+
+      await runPromise;
+    });
+
+    it('should forward SIGTERM to claude process', async () => {
+      const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
+      const mockKill = jest.fn();
+      const mockProcess = {
+        on: jest.fn(),
+        kill: mockKill,
+      } as any;
+
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const wrapper = new ClaudeWrapper();
+      const runPromise = wrapper.run(['--version']);
+
+      // Simulate SIGTERM after spawn
+      process.emit('SIGTERM' as any);
+
+      expect(mockKill).toHaveBeenCalledWith('SIGTERM');
+
+      // Trigger exit to complete the promise
+      const exitCallback = mockProcess.on.mock.calls.find(
+        (call: any) => call[0] === 'exit'
+      )?.[1];
+      if (exitCallback) exitCallback(0);
+
+      await runPromise;
+    });
+  });
 });
