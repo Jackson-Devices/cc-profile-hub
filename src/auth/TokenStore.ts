@@ -1,6 +1,7 @@
 import { readFile, writeFile, rename, stat } from 'fs/promises';
 import { join } from 'path';
 import { TokenData, TokenDataSchema } from './TokenData';
+import { TokenError } from '../errors/TokenError';
 
 export class TokenStore {
   constructor(private readonly storePath: string) {}
@@ -35,8 +36,9 @@ export class TokenStore {
     const stats = await stat(filePath);
     const mode = stats.mode & 0o777;
     if (mode !== 0o600) {
-      throw new Error(
-        `Token file permissions verification failed: expected 0600, got ${mode.toString(8).padStart(4, '0')}`
+      throw new TokenError(
+        `Token file permissions verification failed: expected 0600, got ${mode.toString(8).padStart(4, '0')}`,
+        { profileId, filePath, expectedMode: '0600', actualMode: mode.toString(8).padStart(4, '0') }
       );
     }
   }

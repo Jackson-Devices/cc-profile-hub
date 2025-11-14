@@ -1,4 +1,5 @@
 import { ConfigLoader } from '../../src/config/ConfigLoader';
+import { ConfigError } from '../../src/errors/ConfigError';
 import { join } from 'path';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -39,6 +40,7 @@ oauth:
   it('should throw on missing config file', async () => {
     const loader = new ConfigLoader('/nonexistent/config.yml');
 
+    await expect(loader.load()).rejects.toThrow(ConfigError);
     await expect(loader.load()).rejects.toThrow(/not found/);
   });
 
@@ -48,6 +50,7 @@ oauth:
 
     const loader = new ConfigLoader(configPath);
 
+    await expect(loader.load()).rejects.toThrow(ConfigError);
     await expect(loader.load()).rejects.toThrow(/YAML/);
   });
 

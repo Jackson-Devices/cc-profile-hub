@@ -3,6 +3,8 @@ import { TokenData } from './TokenData';
 import { RefreshConfig, OAuthTokenResponse } from './types';
 import { DEFAULT_RETRY_POLICY, shouldRetry, sleep, RetryPolicy, applyJitter } from './retryPolicy';
 import { MetricsCollector } from './MetricsCollector';
+import { AuthError } from '../errors/AuthError';
+import { NetworkError } from '../errors/NetworkError';
 
 export interface TokenRefresherOptions {
   retryPolicy?: Partial<RetryPolicy>;
@@ -110,7 +112,10 @@ export class TokenRefresher {
               error: error.response?.data?.error || 'invalid_grant',
             });
           }
-          throw new Error(`Token refresh failed: ${error.response?.data?.error || 'invalid_grant'}`);
+          throw new AuthError(
+            `Token refresh failed: ${error.response?.data?.error || 'invalid_grant'}`,
+            { profileId, statusCode, errorType: error.response?.data?.error || 'invalid_grant' }
+          );
         }
 
         // Check if we should retry
@@ -140,7 +145,10 @@ export class TokenRefresher {
       });
     }
 
-    throw new Error(`Token refresh failed after ${attempt} attempts: ${lastError.message}`);
+    throw new NetworkError(
+      `Token refresh failed after ${attempt} attempts: ${lastError.message}`,
+      { profileId, attempts: attempt, lastError: lastError.message }
+    );
   }
 
   private generateFingerprint(): string {

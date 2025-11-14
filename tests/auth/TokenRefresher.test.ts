@@ -1,5 +1,7 @@
 import { TokenRefresher } from '../../src/auth/TokenRefresher';
 import { MetricsCollector } from '../../src/auth/MetricsCollector';
+import { AuthError } from '../../src/errors/AuthError';
+import { NetworkError } from '../../src/errors/NetworkError';
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 
@@ -174,12 +176,14 @@ describe('TokenRefresher Retry Logic', () => {
       error_description: 'refresh token expired',
     });
 
+    await expect(refresher.refresh('expired-refresh', ['user:inference'])).rejects.toThrow(AuthError);
     await expect(refresher.refresh('expired-refresh', ['user:inference'])).rejects.toThrow(/invalid_grant/);
   });
 
   it('should handle 401 error without error field (fallback)', async () => {
     mockHttp.onPost().reply(401, {});
 
+    await expect(refresher.refresh('test-refresh', ['user:inference'])).rejects.toThrow(AuthError);
     await expect(refresher.refresh('test-refresh', ['user:inference'])).rejects.toThrow(/invalid_grant/);
   });
 
@@ -232,6 +236,7 @@ describe('TokenRefresher Retry Logic', () => {
       error: 'rate_limit_exceeded',
     });
 
+    await expect(refresher.refresh('test-refresh', ['user:inference'])).rejects.toThrow(NetworkError);
     await expect(refresher.refresh('test-refresh', ['user:inference'])).rejects.toThrow(/failed after \d+ attempts/i);
   });
 });
@@ -291,7 +296,7 @@ describe('TokenRefresher Metrics Integration', () => {
       error: 'invalid_grant',
     });
 
-    await expect(refresher.refresh('expired-refresh', ['user:inference'], 'test-profile')).rejects.toThrow();
+    await expect(refresher.refresh('expired-refresh', ['user:inference'], 'test-profile')).rejects.toThrow(AuthError);
 
     const metrics = metricsCollector.getMetrics();
     expect(metrics).toHaveLength(1);
@@ -336,7 +341,7 @@ describe('TokenRefresher Metrics Integration', () => {
       error: 'internal_error',
     });
 
-    await expect(refresher.refresh('test-refresh', ['user:inference'], 'test-profile')).rejects.toThrow();
+    await expect(refresher.refresh('test-refresh', ['user:inference'], 'test-profile')).rejects.toThrow(NetworkError);
 
     const metrics = metricsCollector.getMetrics();
     expect(metrics).toHaveLength(1);
