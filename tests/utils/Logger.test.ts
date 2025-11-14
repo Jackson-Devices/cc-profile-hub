@@ -123,3 +123,92 @@ describe('Logger Token Redaction', () => {
     expect(logs[0].headers.authorization).toBe('[REDACTED]');
   });
 });
+
+describe('Logger Methods Without Args', () => {
+  let logs: any[];
+  let mockWrite: jest.SpyInstance;
+
+  beforeEach(() => {
+    logs = [];
+    mockWrite = jest.spyOn(process.stdout, 'write').mockImplementation((chunk: any) => {
+      logs.push(JSON.parse(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    mockWrite.mockRestore();
+  });
+
+  it('should log trace without additional args', () => {
+    const logger = new Logger({ level: 'trace' });
+    logger.trace('trace message');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('trace message');
+    expect(logs[0].level).toBe(10); // pino trace level
+  });
+
+  it('should log trace with args', () => {
+    const logger = new Logger({ level: 'trace' });
+    logger.trace('trace message', { foo: 'bar' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('trace message');
+    expect(logs[0].foo).toBe('bar');
+  });
+
+  it('should log debug without additional args', () => {
+    const logger = new Logger({ level: 'debug' });
+    logger.debug('debug message');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('debug message');
+    expect(logs[0].level).toBe(20); // pino debug level
+  });
+
+  it('should log debug with args', () => {
+    const logger = new Logger({ level: 'debug' });
+    logger.debug('debug message', { context: 'test' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('debug message');
+    expect(logs[0].context).toBe('test');
+  });
+
+  it('should log warn without additional args', () => {
+    const logger = new Logger({ level: 'warn' });
+    logger.warn('warn message');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('warn message');
+    expect(logs[0].level).toBe(40); // pino warn level
+  });
+
+  it('should log warn with args', () => {
+    const logger = new Logger({ level: 'warn' });
+    logger.warn('warn message', { warning: 'details' });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('warn message');
+    expect(logs[0].warning).toBe('details');
+  });
+
+  it('should log error without additional args', () => {
+    const logger = new Logger({ level: 'error' });
+    logger.error('error message');
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('error message');
+    expect(logs[0].level).toBe(50); // pino error level
+  });
+
+  it('should log error with args', () => {
+    const logger = new Logger({ level: 'error' });
+    logger.error('error message', { code: 500 });
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].msg).toBe('error message');
+    expect(logs[0].code).toBe(500);
+  });
+});
