@@ -1,26 +1,27 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
+import {
+  ProcessInterceptor,
+  ProcessInterceptorConfig,
+  ProcessSpawnEvent,
+  RunOptions,
+} from './ProcessInterceptor.interface';
 
-export interface WrapperConfig {
+export interface WrapperConfig extends ProcessInterceptorConfig {
   claudeBinaryPath?: string;
 }
 
-export interface SpawnEvent {
-  args: string[];
-  timestamp: number;
-}
-
-export class ClaudeWrapper extends EventEmitter {
+export class ClaudeWrapper extends EventEmitter implements ProcessInterceptor {
   private readonly claudeBinary: string;
 
   constructor(config: WrapperConfig = {}) {
     super();
-    this.claudeBinary = config.claudeBinaryPath || 'claude-original';
+    this.claudeBinary = config.claudeBinaryPath || config.binaryPath || 'claude-original';
   }
 
-  async run(args: string[], options: { env?: Record<string, string> } = {}): Promise<number> {
+  async run(args: string[], options: RunOptions = {}): Promise<number> {
     return new Promise((resolve) => {
-      const spawnEvent: SpawnEvent = {
+      const spawnEvent: ProcessSpawnEvent = {
         args,
         timestamp: Date.now(),
       };
