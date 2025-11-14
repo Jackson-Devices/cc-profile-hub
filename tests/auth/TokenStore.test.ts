@@ -1,6 +1,6 @@
 import { TokenStore } from '../../src/auth/TokenStore';
 import { TokenData } from '../../src/auth/TokenData';
-import { mkdirSync, writeFileSync, rmSync, readdirSync } from 'fs';
+import { mkdirSync, writeFileSync, rmSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -136,5 +136,30 @@ describe('TokenStore Write', () => {
     const files = readdirSync(tempDir);
     const tempFiles = files.filter((f: string) => f.includes('.tmp'));
     expect(tempFiles).toHaveLength(0);
+  });
+
+  it('should set file permissions to 0600 (owner read/write only)', async () => {
+    const profileId = 'permission-test';
+    const tokenData: TokenData = {
+      accessToken: 'sensitive-token',
+      refreshToken: 'sensitive-refresh',
+      expiresAt: Date.now() + 3600000,
+      grantedAt: Date.now(),
+      scopes: ['user:inference'],
+      tokenType: 'Bearer',
+      deviceFingerprint: 'device-123',
+    };
+
+    await store.write(profileId, tokenData);
+
+    // Check file permissions
+    const filePath = join(tempDir, `${profileId}.token.json`);
+    const stats = statSync(filePath);
+
+    // Extract file mode (permissions) - mask out file type bits
+    const mode = stats.mode & 0o777;
+
+    // Expect 0600 (owner read/write only)
+    expect(mode).toBe(0o600);
   });
 });
