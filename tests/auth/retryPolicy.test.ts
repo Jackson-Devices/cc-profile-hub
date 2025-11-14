@@ -1,4 +1,4 @@
-import { applyJitter, DEFAULT_RETRY_POLICY } from '../../src/auth/retryPolicy';
+import { applyJitter } from '../../src/auth/retryPolicy';
 
 describe('Retry Policy Jitter', () => {
   it('should apply jitter within ±20% range', () => {

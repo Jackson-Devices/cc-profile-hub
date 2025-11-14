@@ -272,13 +272,13 @@ oauth:
 
     // Mock js-yaml before importing ConfigLoader
     jest.doMock('js-yaml', () => ({
-      load: () => {
-        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      load: (): never => {
         throw 'String error instead of Error object';
       },
     }));
 
     // Import ConfigLoader with mocked js-yaml
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ConfigLoader: MockedConfigLoader } = require('../../src/config/ConfigLoader');
     const loader = new MockedConfigLoader(configPath);
 

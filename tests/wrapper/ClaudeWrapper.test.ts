@@ -18,6 +18,7 @@ describe('ClaudeWrapper', () => {
     mockChildProcess.kill = jest.fn();
 
     // Mock spawn to return our mock child process
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     spawn = require('child_process').spawn;
     spawn.mockReturnValue(mockChildProcess);
 
@@ -168,6 +169,7 @@ describe('ClaudeWrapper', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     // Simulate SIGINT
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     process.emit('SIGINT' as any);
 
     expect(mockChildProcess.kill).toHaveBeenCalledWith('SIGINT');
@@ -187,6 +189,7 @@ describe('ClaudeWrapper', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     // Simulate SIGTERM
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     process.emit('SIGTERM' as any);
 
     expect(mockChildProcess.kill).toHaveBeenCalledWith('SIGTERM');

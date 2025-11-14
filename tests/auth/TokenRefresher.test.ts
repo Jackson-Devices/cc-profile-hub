@@ -106,7 +106,7 @@ describe('TokenRefresher Retry Logic', () => {
       {
         retryPolicy: {
           // Use shorter delays for faster tests
-          getDelayMs: () => 10,
+          getDelayMs: (): number => 10,
         },
       }
     );
@@ -194,7 +194,7 @@ describe('TokenRefresher Retry Logic', () => {
       {
         retryPolicy: {
           applyJitter: false,
-          getDelayMs: () => 100,
+          getDelayMs: (): number => 100,
           maxAttempts: 3,
         },
       }
@@ -254,7 +254,7 @@ describe('TokenRefresher Metrics Integration', () => {
       },
       {
         retryPolicy: {
-          getDelayMs: () => 10,
+          getDelayMs: (): number => 10,
         },
         metricsCollector,
       }

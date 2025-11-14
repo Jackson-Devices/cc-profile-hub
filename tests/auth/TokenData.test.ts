@@ -111,6 +111,7 @@ describe('TokenData Validation', () => {
 
 describe('isTokenExpired', () => {
   it('should return false for non-expired token', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isTokenExpired } = require('../../src/auth/TokenData');
     const token: TokenData = {
       accessToken: 'test',
@@ -126,6 +127,7 @@ describe('isTokenExpired', () => {
   });
 
   it('should return true for expired token', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isTokenExpired } = require('../../src/auth/TokenData');
     const token: TokenData = {
       accessToken: 'test',
@@ -141,6 +143,7 @@ describe('isTokenExpired', () => {
   });
 
   it('should respect buffer seconds', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isTokenExpired } = require('../../src/auth/TokenData');
     const token: TokenData = {
       accessToken: 'test',
@@ -160,6 +163,7 @@ describe('isTokenExpired', () => {
   });
 
   it('should handle exact expiration time', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isTokenExpired } = require('../../src/auth/TokenData');
     const now = Date.now();
     const token: TokenData = {
