@@ -371,3 +371,111 @@ describe('TokenRefresher Metrics Integration', () => {
     noMetricsHttp.reset();
   });
 });
+
+describe('TokenRefresher Token Rotation', () => {
+  let refresher: TokenRefresher;
+  let mockHttp: MockAdapter;
+
+  beforeEach(() => {
+    const httpClient = axios.create();
+    mockHttp = new MockAdapter(httpClient);
+    refresher = new TokenRefresher({
+      httpClient,
+      tokenUrl: 'https://api.anthropic.com/oauth/token',
+      clientId: 'test-client-id',
+    });
+  });
+
+  afterEach(() => {
+    mockHttp.reset();
+  });
+
+  it('should return new refresh token when rotated by server', async () => {
+    const oldRefreshToken = 'old-refresh-token-123';
+    const newRefreshToken = 'new-refresh-token-456';
+
+    mockHttp.onPost('https://api.anthropic.com/oauth/token').reply(200, {
+      access_token: 'new-access-token',
+      refresh_token: newRefreshToken,
+      expires_in: 3600,
+      token_type: 'Bearer',
+      scope: 'user:inference',
+    });
+
+    const result = await refresher.refresh(oldRefreshToken, ['user:inference']);
+
+    expect(result.refreshToken).toBe(newRefreshToken);
+    expect(result.refreshToken).not.toBe(oldRefreshToken);
+  });
+
+  it('should handle same refresh token when not rotated', async () => {
+    const refreshToken = 'stable-refresh-token';
+
+    mockHttp.onPost('https://api.anthropic.com/oauth/token').reply(200, {
+      access_token: 'new-access-token',
+      refresh_token: refreshToken, // Same token returned
+      expires_in: 3600,
+      token_type: 'Bearer',
+      scope: 'user:inference',
+    });
+
+    const result = await refresher.refresh(refreshToken, ['user:inference']);
+
+    expect(result.refreshToken).toBe(refreshToken);
+  });
+
+  it('should use new refresh token for subsequent requests after rotation', async () => {
+    let requestCount = 0;
+    const tokens = ['refresh-1', 'refresh-2', 'refresh-3'];
+
+    mockHttp.onPost('https://api.anthropic.com/oauth/token').reply((config) => {
+      const data = JSON.parse(config.data);
+      const expectedToken = tokens[requestCount];
+
+      expect(data.refresh_token).toBe(expectedToken);
+
+      requestCount++;
+      const nextToken = tokens[requestCount];
+
+      return [
+        200,
+        {
+          access_token: `access-${requestCount}`,
+          refresh_token: nextToken,
+          expires_in: 3600,
+          token_type: 'Bearer',
+          scope: 'user:inference',
+        },
+      ];
+    });
+
+    // First refresh
+    let result = await refresher.refresh(tokens[0], ['user:inference']);
+    expect(result.refreshToken).toBe(tokens[1]);
+
+    // Second refresh using rotated token
+    result = await refresher.refresh(result.refreshToken, ['user:inference']);
+    expect(result.refreshToken).toBe(tokens[2]);
+  });
+
+  it('should preserve all token data during rotation', async () => {
+    mockHttp.onPost('https://api.anthropic.com/oauth/token').reply(200, {
+      access_token: 'rotated-access-token',
+      refresh_token: 'rotated-refresh-token',
+      expires_in: 7200,
+      token_type: 'Bearer',
+      scope: 'user:inference user:profile',
+    });
+
+    const result = await refresher.refresh('old-refresh', ['user:inference', 'user:profile']);
+
+    expect(result).toMatchObject({
+      accessToken: 'rotated-access-token',
+      refreshToken: 'rotated-refresh-token',
+      tokenType: 'Bearer',
+      scopes: ['user:inference', 'user:profile'],
+    });
+    expect(result.expiresAt).toBeGreaterThan(Date.now());
+    expect(result.grantedAt).toBeLessThanOrEqual(Date.now());
+  });
+});

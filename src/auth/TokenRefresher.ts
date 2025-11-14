@@ -9,6 +9,38 @@ export interface TokenRefresherOptions {
   metricsCollector?: MetricsCollector;
 }
 
+/**
+ * Handles OAuth 2.0 token refresh with retry logic and metrics collection.
+ *
+ * Features:
+ * - Exponential backoff with configurable jitter for transient failures
+ * - Automatic retry on 429 (rate limit) and 5xx server errors
+ * - Token rotation support (handles new refresh_token from server)
+ * - Optional metrics collection for monitoring and debugging
+ * - Profile-based tracking for multi-profile scenarios
+ *
+ * Token Rotation:
+ * OAuth 2.0 servers may rotate refresh tokens for security. This class
+ * automatically handles rotation by returning the new refresh_token from
+ * the server response. Callers should always use the returned refreshToken
+ * for subsequent requests, not the original token.
+ *
+ * @example
+ * ```typescript
+ * const refresher = new TokenRefresher({
+ *   httpClient: axios.create(),
+ *   tokenUrl: 'https://api.example.com/oauth/token',
+ *   clientId: 'my-client-id',
+ *   clientSecret: 'my-secret', // optional
+ * }, {
+ *   retryPolicy: { maxAttempts: 3 },
+ *   metricsCollector: new MetricsCollector(),
+ * });
+ *
+ * const tokenData = await refresher.refresh(currentRefreshToken, scopes, profileId);
+ * // Always use tokenData.refreshToken for next refresh, not currentRefreshToken
+ * ```
+ */
 export class TokenRefresher {
   private retryPolicy: RetryPolicy;
   private metricsCollector?: MetricsCollector;
