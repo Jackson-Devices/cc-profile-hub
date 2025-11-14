@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { TokenData } from './TokenData';
 import { RefreshConfig, OAuthTokenResponse } from './types';
-import { DEFAULT_RETRY_POLICY, shouldRetry, sleep, RetryPolicy } from './retryPolicy';
+import { DEFAULT_RETRY_POLICY, shouldRetry, sleep, RetryPolicy, applyJitter } from './retryPolicy';
 
 export class TokenRefresher {
   private retryPolicy: RetryPolicy;
@@ -55,8 +55,12 @@ export class TokenRefresher {
           break;
         }
 
-        // Wait before retry
-        const delayMs = this.retryPolicy.getDelayMs(attempt);
+        // Apply jitter to delay
+        let delayMs = this.retryPolicy.getDelayMs(attempt);
+        if (this.retryPolicy.applyJitter) {
+          delayMs = applyJitter(delayMs);
+        }
+
         await sleep(delayMs);
       }
     }
