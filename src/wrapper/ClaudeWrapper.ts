@@ -18,8 +18,22 @@ export class ClaudeWrapper {
         shell: false,
       });
 
-      claudeProcess.on('exit', (code) => {
-        resolve(code || 0);
+      // Forward signals
+      const sigintHandler = (): void => {
+        claudeProcess.kill('SIGINT');
+      };
+
+      const sigtermHandler = (): void => {
+        claudeProcess.kill('SIGTERM');
+      };
+
+      process.on('SIGINT', sigintHandler);
+      process.on('SIGTERM', sigtermHandler);
+
+      claudeProcess.on('exit', (code, signal) => {
+        process.off('SIGINT', sigintHandler);
+        process.off('SIGTERM', sigtermHandler);
+        resolve(signal ? 128 + (signal as any) : code || 0);
       });
     });
   }
