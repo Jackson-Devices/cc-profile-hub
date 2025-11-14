@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ClaudeWrapper } from '../../../src/wrapper/ClaudeWrapper';
 import { spawn } from 'child_process';
 

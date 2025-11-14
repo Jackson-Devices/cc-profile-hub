@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import {
   ProcessInterceptor,
@@ -52,7 +52,7 @@ export class ClaudeWrapper extends EventEmitter implements ProcessInterceptor {
         process.off('SIGINT', sigintHandler);
         process.off('SIGTERM', sigtermHandler);
 
-        const exitCode = signal ? 128 + (signal as any) : code || 0;
+        const exitCode = signal ? 1 : code || 0;
 
         this.emit('afterSpawn', {
           ...spawnEvent,
