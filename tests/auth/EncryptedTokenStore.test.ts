@@ -1,6 +1,6 @@
 import { EncryptedTokenStore } from '../../src/auth/EncryptedTokenStore';
 import { TokenData } from '../../src/auth/TokenData';
-import { mkdirSync, rmSync, readFileSync } from 'fs';
+import { mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -131,7 +131,7 @@ describe('EncryptedTokenStore Corruption Recovery', () => {
 
     // Write corrupted encrypted data
     const corruptedData = JSON.stringify({ encrypted: 'invalid-base64-data!!!' });
-    require('fs').writeFileSync(filePath, corruptedData);
+    writeFileSync(filePath, corruptedData);
 
     const result = await store.read(profileId);
     expect(result).toBeNull();
@@ -142,7 +142,7 @@ describe('EncryptedTokenStore Corruption Recovery', () => {
     const filePath = join(tempDir, `${profileId}.token.json`);
 
     // Write malformed JSON
-    require('fs').writeFileSync(filePath, '{ invalid json content }');
+    writeFileSync(filePath, '{ invalid json content }');
 
     const result = await store.read(profileId);
     expect(result).toBeNull();
@@ -164,10 +164,10 @@ describe('EncryptedTokenStore Corruption Recovery', () => {
     await store.write(profileId, tokenData);
 
     // Corrupt the file by truncating it
-    const filePath = join(tempDir, `${profileId}.token.json`);
-    const content = readFileSync(filePath, 'utf-8');
+    const corruptedFilePath = join(tempDir, `${profileId}.token.json`);
+    const content = readFileSync(corruptedFilePath, 'utf-8');
     const truncated = content.slice(0, content.length / 2);
-    require('fs').writeFileSync(filePath, truncated);
+    writeFileSync(corruptedFilePath, truncated);
 
     const result = await store.read(profileId);
     expect(result).toBeNull();
@@ -175,12 +175,11 @@ describe('EncryptedTokenStore Corruption Recovery', () => {
 
   it('should recover from leftover temp files on next write', async () => {
     const profileId = 'temp-recovery';
-    const filePath = join(tempDir, `${profileId}.token.json`);
     const tempPath = join(tempDir, `${profileId}.token.json.tmp`);
 
     // Simulate leftover temp file from crashed write
     const tempData = JSON.stringify({ encrypted: 'old-temp-data' });
-    require('fs').writeFileSync(tempPath, tempData);
+    writeFileSync(tempPath, tempData);
 
     // Write new data - should succeed and overwrite temp file
     const tokenData: TokenData = {

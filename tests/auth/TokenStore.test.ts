@@ -1,6 +1,6 @@
 import { TokenStore } from '../../src/auth/TokenStore';
 import { TokenData } from '../../src/auth/TokenData';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdirSync, writeFileSync, rmSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -133,7 +133,6 @@ describe('TokenStore Write', () => {
     await store.write(profileId, tokenData);
 
     // Verify no temp files remain
-    const { readdirSync } = require('fs');
     const files = readdirSync(tempDir);
     const tempFiles = files.filter((f: string) => f.includes('.tmp'));
     expect(tempFiles).toHaveLength(0);

@@ -38,7 +38,7 @@ export class EncryptedTokenStore {
 
       // Not encrypted format, try to parse as TokenData
       return TokenDataSchema.parse(parsed);
-    } catch (error: unknown) {
+    } catch {
       // File not found, decryption failed, or validation failed
       return null;
     }

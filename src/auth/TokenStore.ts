@@ -15,7 +15,7 @@ export class TokenStore {
       // Validate with Zod schema (don't use validateTokenData to avoid expiry check)
       const validated = TokenDataSchema.parse(parsed);
       return validated;
-    } catch (error: unknown) {
+    } catch {
       // Return null for any error (file not found, invalid JSON, validation failure)
       return null;
     }
