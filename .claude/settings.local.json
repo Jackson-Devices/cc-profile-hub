@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(dir /a \"C:\\Users\\analo\\DEVfolder\\cc-profile-hub\")",
+      "Bash(dir:*)",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:auth0.com)",
+      "Bash(gh issue create:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
