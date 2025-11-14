@@ -2,8 +2,9 @@ import { readFile, writeFile, rename, stat } from 'fs/promises';
 import { join } from 'path';
 import { TokenData, TokenDataSchema } from './TokenData';
 import { TokenError } from '../errors/TokenError';
+import { ITokenStore } from './ITokenStore';
 
-export class TokenStore {
+export class TokenStore implements ITokenStore {
   constructor(private readonly storePath: string) {}
 
   async read(profileId: string): Promise<TokenData | null> {

@@ -3,8 +3,9 @@ import { TokenData, TokenDataSchema } from './TokenData';
 import { encrypt, decrypt } from '../crypto/encryption';
 import { readFile, writeFile, rename } from 'fs/promises';
 import { join } from 'path';
+import { ITokenStore } from './ITokenStore';
 
-export class EncryptedTokenStore {
+export class EncryptedTokenStore implements ITokenStore {
   private store: TokenStore;
   private storePath: string;
 
