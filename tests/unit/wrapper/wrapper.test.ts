@@ -159,4 +159,48 @@ describe('ClaudeWrapper', () => {
       expect(spawnOptions.env).toHaveProperty('PATH', originalEnv);
     });
   });
+
+  describe('Lifecycle Events', () => {
+    it('should emit beforeSpawn and afterSpawn events', async () => {
+      const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
+      const mockProcess = {
+        on: jest.fn((event: string, callback: (code: number) => void) => {
+          if (event === 'exit') {
+            callback(0);
+          }
+          return mockProcess;
+        }),
+        kill: jest.fn(),
+      } as any;
+
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const wrapper = new ClaudeWrapper();
+      const beforeSpy = jest.fn();
+      const afterSpy = jest.fn();
+
+      wrapper.on('beforeSpawn', beforeSpy);
+      wrapper.on('afterSpawn', afterSpy);
+
+      await wrapper.run(['--version']);
+
+      expect(beforeSpy).toHaveBeenCalledTimes(1);
+      expect(beforeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          args: ['--version'],
+          timestamp: expect.any(Number),
+        })
+      );
+
+      expect(afterSpy).toHaveBeenCalledTimes(1);
+      expect(afterSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          args: ['--version'],
+          timestamp: expect.any(Number),
+          exitCode: 0,
+          duration: expect.any(Number),
+        })
+      );
+    });
+  });
 });
