@@ -1,8 +1,9 @@
-import { readFile, writeFile, rename, stat } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { TokenData, TokenDataSchema } from './TokenData';
 import { TokenError } from '../errors/TokenError';
 import { ITokenStore } from './ITokenStore';
+import { atomicWrite } from '../utils/atomicWrite';
 
 export class TokenStore implements ITokenStore {
   constructor(private readonly storePath: string) {}
@@ -25,22 +26,18 @@ export class TokenStore implements ITokenStore {
 
   async write(profileId: string, tokenData: TokenData): Promise<void> {
     const filePath = join(this.storePath, `${profileId}.token.json`);
-    const tempPath = join(this.storePath, `${profileId}.token.json.tmp`);
-
-    // Atomic write: write to temp file, then rename
-    // SECURITY: Set mode to 0600 (owner read/write only) to prevent unauthorized access
     const content = JSON.stringify(tokenData, null, 2);
-    await writeFile(tempPath, content, { encoding: 'utf-8', mode: 0o600 });
-    await rename(tempPath, filePath);
 
-    // SECURITY: Verify permissions were set correctly
-    const stats = await stat(filePath);
-    const mode = stats.mode & 0o777;
-    if (mode !== 0o600) {
-      throw new TokenError(
-        `Token file permissions verification failed: expected 0600, got ${mode.toString(8).padStart(4, '0')}`,
-        { profileId, filePath, expectedMode: '0600', actualMode: mode.toString(8).padStart(4, '0') }
-      );
+    try {
+      // SECURITY: Set mode to 0600 (owner read/write only) to prevent unauthorized access
+      // atomicWrite will verify permissions after write
+      await atomicWrite(filePath, content, { mode: 0o600 });
+    } catch (error) {
+      // Convert generic permission errors to TokenError
+      if (error instanceof Error && error.message.includes('permissions verification failed')) {
+        throw new TokenError(error.message, { profileId, filePath });
+      }
+      throw error;
     }
   }
 }

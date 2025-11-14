@@ -1,9 +1,10 @@
 import { TokenStore } from './TokenStore';
 import { TokenData, TokenDataSchema } from './TokenData';
 import { encrypt, decrypt } from '../crypto/encryption';
-import { readFile, writeFile, rename } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { ITokenStore } from './ITokenStore';
+import { atomicWrite } from '../utils/atomicWrite';
 
 export class EncryptedTokenStore implements ITokenStore {
   private store: TokenStore;
@@ -57,11 +58,9 @@ export class EncryptedTokenStore implements ITokenStore {
     const encrypted = await encrypt(plaintext, this.passphrase);
 
     const filePath = join(this.storePath, `${profileId}.token.json`);
-    const tempPath = join(this.storePath, `${profileId}.token.json.tmp`);
+    const content = JSON.stringify({ encrypted }, null, 2);
 
     // Atomic write: write to temp file, then rename
-    const content = JSON.stringify({ encrypted }, null, 2);
-    await writeFile(tempPath, content, 'utf-8');
-    await rename(tempPath, filePath);
+    await atomicWrite(filePath, content);
   }
 }
