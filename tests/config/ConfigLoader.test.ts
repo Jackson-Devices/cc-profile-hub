@@ -50,6 +50,16 @@ oauth:
 
     await expect(loader.load()).rejects.toThrow(/YAML/);
   });
+
+  it('should rethrow non-ENOENT errors (e.g., EISDIR)', async () => {
+    const dirPath = join(tempDir, 'config-is-a-dir.yml');
+    mkdirSync(dirPath, { recursive: true });
+
+    const loader = new ConfigLoader(dirPath);
+
+    // Should throw EISDIR error (trying to read a directory as a file)
+    await expect(loader.load()).rejects.toThrow();
+  });
 });
 
 describe('ConfigLoader Environment Overrides', () => {
@@ -229,5 +239,52 @@ oauth:
     expect(config.oauth.tokenUrl).toBe('https://new-url.example.com/token');
     expect(config.oauth.clientId).toBe('original-client');
     expect(config.oauth.scopes).toEqual(['user:inference', 'user:profile']);
+  });
+});
+
+describe('ConfigLoader YAML Error Handling', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = join(tmpdir(), `config-test-${Date.now()}`);
+    mkdirSync(tempDir, { recursive: true });
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+    jest.restoreAllMocks();
+  });
+
+  it('should handle non-Error YAML parsing exceptions', async () => {
+    const configPath = join(tempDir, 'test.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /usr/bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: test-client
+`
+    );
+
+    // Mock js-yaml before importing ConfigLoader
+    jest.doMock('js-yaml', () => ({
+      load: () => {
+        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+        throw 'String error instead of Error object';
+      },
+    }));
+
+    // Import ConfigLoader with mocked js-yaml
+    const { ConfigLoader: MockedConfigLoader } = require('../../src/config/ConfigLoader');
+    const loader = new MockedConfigLoader(configPath);
+
+    await expect(loader.load()).rejects.toThrow(/Invalid YAML in config file: Unknown error/);
+
+    // Clean up mock
+    jest.dontMock('js-yaml');
   });
 });
