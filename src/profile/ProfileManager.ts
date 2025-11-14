@@ -2,6 +2,12 @@ import { readFile } from 'fs/promises';
 import { ProfileRecord, ProfileRecordSchema, ProfileConfig } from './ProfileTypes';
 import { atomicWrite } from '../utils/atomicWrite';
 import { ValidationError } from '../errors/ValidationError';
+import {
+  validateProfileId,
+  validatePath,
+  validateAuth0Domain,
+  validateAuth0ClientId,
+} from '../utils/InputValidator';
 
 /**
  * Storage structure for profiles on disk.
@@ -30,6 +36,12 @@ export class ProfileManager {
     profileId: string,
     config: ProfileConfig
   ): Promise<ProfileRecord> {
+    // Validate all inputs before proceeding
+    validateProfileId(profileId);
+    validateAuth0Domain(config.auth0Domain);
+    validateAuth0ClientId(config.auth0ClientId);
+    validatePath(config.tokenStorePath);
+
     const storage = await this.loadStorage();
 
     if (storage.profiles[profileId]) {
