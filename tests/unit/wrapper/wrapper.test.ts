@@ -145,13 +145,14 @@ describe('ClaudeWrapper', () => {
         kill: jest.fn(),
       } as any;
 
+      mockSpawn.mockClear();
       mockSpawn.mockReturnValue(mockProcess);
 
       const originalEnv = process.env.PATH;
       const wrapper = new ClaudeWrapper();
       await wrapper.run(['prompt'], { env: { CUSTOM_VAR: 'value' } });
 
-      const spawnCall = mockSpawn.mock.calls[0];
+      const spawnCall = mockSpawn.mock.calls[mockSpawn.mock.calls.length - 1];
       const spawnOptions = spawnCall[2] as any;
 
       expect(spawnOptions.env).toHaveProperty('CUSTOM_VAR', 'value');

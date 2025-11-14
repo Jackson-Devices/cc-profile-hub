@@ -11,11 +11,14 @@ export class ClaudeWrapper {
     this.claudeBinary = config.claudeBinaryPath || 'claude-original';
   }
 
-  async run(args: string[]): Promise<number> {
+  async run(args: string[], options: { env?: Record<string, string> } = {}): Promise<number> {
     return new Promise((resolve) => {
+      const env = { ...process.env, ...options.env };
+
       const claudeProcess = spawn(this.claudeBinary, args, {
         stdio: 'inherit',
         shell: false,
+        env,
       });
 
       // Forward signals
