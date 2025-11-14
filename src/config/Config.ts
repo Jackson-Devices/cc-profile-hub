@@ -11,11 +11,11 @@ export class Config {
     return this.data.claudePath;
   }
 
-  get oauth() {
+  get oauth(): ConfigData['oauth'] {
     return this.data.oauth;
   }
 
-  get logging() {
+  get logging(): ConfigData['logging'] {
     return this.data.logging;
   }
 

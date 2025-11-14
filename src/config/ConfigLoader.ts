@@ -11,8 +11,8 @@ export class ConfigLoader {
 
     try {
       content = await readFile(this.configPath, 'utf-8');
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
         throw new Error(`Config file not found: ${this.configPath}`);
       }
       throw error;
@@ -21,8 +21,9 @@ export class ConfigLoader {
     let parsed: unknown;
     try {
       parsed = parseYaml(content);
-    } catch (error: any) {
-      throw new Error(`Invalid YAML in config file: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Invalid YAML in config file: ${message}`);
     }
 
     // Apply environment overrides
