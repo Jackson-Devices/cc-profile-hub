@@ -105,4 +105,57 @@ describe('ClaudeWrapper', () => {
       await runPromise;
     });
   });
+
+  describe('Environment Management', () => {
+    it('should inject custom environment variables', async () => {
+      const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
+      const mockProcess = {
+        on: jest.fn((event: string, callback: (code: number) => void) => {
+          if (event === 'exit') {
+            callback(0);
+          }
+          return mockProcess;
+        }),
+        kill: jest.fn(),
+      } as any;
+
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const wrapper = new ClaudeWrapper();
+      await wrapper.run(['prompt'], { env: { CUSTOM_VAR: 'value' } });
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({
+          env: expect.objectContaining({ CUSTOM_VAR: 'value' }),
+        })
+      );
+    });
+
+    it('should merge custom env with parent env', async () => {
+      const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
+      const mockProcess = {
+        on: jest.fn((event: string, callback: (code: number) => void) => {
+          if (event === 'exit') {
+            callback(0);
+          }
+          return mockProcess;
+        }),
+        kill: jest.fn(),
+      } as any;
+
+      mockSpawn.mockReturnValue(mockProcess);
+
+      const originalEnv = process.env.PATH;
+      const wrapper = new ClaudeWrapper();
+      await wrapper.run(['prompt'], { env: { CUSTOM_VAR: 'value' } });
+
+      const spawnCall = mockSpawn.mock.calls[0];
+      const spawnOptions = spawnCall[2] as any;
+
+      expect(spawnOptions.env).toHaveProperty('CUSTOM_VAR', 'value');
+      expect(spawnOptions.env).toHaveProperty('PATH', originalEnv);
+    });
+  });
 });
