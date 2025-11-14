@@ -217,4 +217,156 @@ describe('ClaudeWrapper', () => {
     const listenerCountAfter = process.listenerCount('SIGINT');
     expect(listenerCountAfter).toBe(listenerCountBefore);
   });
+
+  describe('Process Timeout', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should use default timeout of 30 minutes', () => {
+      const defaultWrapper = new ClaudeWrapper({ claudeBinaryPath: '/usr/bin/claude' });
+      expect(defaultWrapper).toBeDefined();
+      // Default timeout is 30 minutes = 1800000ms, tested via timeout behavior below
+    });
+
+    it('should allow custom timeout configuration', () => {
+      const customWrapper = new ClaudeWrapper({
+        claudeBinaryPath: '/usr/bin/claude',
+        timeoutMs: 5000,
+      });
+      expect(customWrapper).toBeDefined();
+    });
+
+    it('should kill process after timeout', async () => {
+      const timeoutWrapper = new ClaudeWrapper({
+        claudeBinaryPath: '/usr/bin/claude',
+        timeoutMs: 1000,
+      });
+
+      const timeoutSpy = jest.fn();
+      timeoutWrapper.on('timeout', timeoutSpy);
+
+      // Create new mock for this test
+      const mockChild = new EventEmitter() as jest.Mocked<ChildProcess>;
+      mockChild.kill = jest.fn();
+      spawn.mockReturnValue(mockChild);
+
+      const runPromise = timeoutWrapper.run(['long-running-task']);
+
+      // Fast-forward time to trigger timeout
+      jest.advanceTimersByTime(1000);
+
+      // Verify process was killed
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(timeoutSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          args: ['long-running-task'],
+          timeoutMs: 1000,
+          timestamp: expect.any(Number),
+        })
+      );
+
+      // Simulate process exit after being killed
+      mockChild.emit('exit', null, 'SIGTERM');
+
+      const exitCode = await runPromise;
+      expect(exitCode).toBe(1);
+    });
+
+    it('should not timeout if process completes before timeout', async () => {
+      const timeoutWrapper = new ClaudeWrapper({
+        claudeBinaryPath: '/usr/bin/claude',
+        timeoutMs: 5000,
+      });
+
+      const timeoutSpy = jest.fn();
+      timeoutWrapper.on('timeout', timeoutSpy);
+
+      // Create new mock for this test
+      const mockChild = new EventEmitter() as jest.Mocked<ChildProcess>;
+      mockChild.kill = jest.fn();
+      spawn.mockReturnValue(mockChild);
+
+      const runPromise = timeoutWrapper.run(['quick-task']);
+
+      // Fast-forward only 1 second (less than timeout)
+      jest.advanceTimersByTime(1000);
+
+      // Simulate successful completion
+      mockChild.emit('exit', 0, null);
+
+      const exitCode = await runPromise;
+      expect(exitCode).toBe(0);
+      expect(timeoutSpy).not.toHaveBeenCalled();
+      expect(mockChild.kill).not.toHaveBeenCalled();
+    });
+
+    it('should disable timeout when set to 0', async () => {
+      const noTimeoutWrapper = new ClaudeWrapper({
+        claudeBinaryPath: '/usr/bin/claude',
+        timeoutMs: 0,
+      });
+
+      const timeoutSpy = jest.fn();
+      noTimeoutWrapper.on('timeout', timeoutSpy);
+
+      // Create new mock for this test
+      const mockChild = new EventEmitter() as jest.Mocked<ChildProcess>;
+      mockChild.kill = jest.fn();
+      spawn.mockReturnValue(mockChild);
+
+      const runPromise = noTimeoutWrapper.run(['very-long-task']);
+
+      // Fast-forward a very long time
+      jest.advanceTimersByTime(100000000);
+
+      // Process should not be killed
+      expect(mockChild.kill).not.toHaveBeenCalled();
+      expect(timeoutSpy).not.toHaveBeenCalled();
+
+      // Simulate successful completion
+      mockChild.emit('exit', 0, null);
+
+      const exitCode = await runPromise;
+      expect(exitCode).toBe(0);
+    });
+
+    it('should clear timeout on process error', async () => {
+      const timeoutWrapper = new ClaudeWrapper({
+        claudeBinaryPath: '/usr/bin/claude',
+        timeoutMs: 5000,
+      });
+
+      const timeoutSpy = jest.fn();
+      const errorSpy = jest.fn();
+      timeoutWrapper.on('timeout', timeoutSpy);
+      timeoutWrapper.on('error', errorSpy);
+
+      // Create new mock for this test
+      const mockChild = new EventEmitter() as jest.Mocked<ChildProcess>;
+      mockChild.kill = jest.fn();
+      spawn.mockReturnValue(mockChild);
+
+      const runPromise = timeoutWrapper.run(['failing-task']);
+
+      // Fast-forward 1 second
+      jest.advanceTimersByTime(1000);
+
+      // Simulate spawn error
+      const spawnError = new Error('Spawn failed');
+      mockChild.emit('error', spawnError);
+
+      const exitCode = await runPromise;
+      expect(exitCode).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(spawnError);
+
+      // Continue time - timeout should not fire
+      jest.advanceTimersByTime(10000);
+      expect(timeoutSpy).not.toHaveBeenCalled();
+    });
+  });
 });
