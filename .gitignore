@@ -20,7 +20,11 @@ coverage/
 *.swp
 *.swo
 *~
+
+# OS
 .DS_Store
+Thumbs.db
+desktop.ini
 
 # Environment
 .env
@@ -33,11 +37,6 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
 
 # Temporary files
 *.tmp
