@@ -21,7 +21,7 @@ describe('ProfileManager - Concurrent Operations', () => {
   });
 
   it('should handle 10 concurrent profile creations without data loss', async () => {
-    const manager = new ProfileManager(profilesPath);
+    const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
     const promises: Promise<void>[] = [];
 
     // Create 10 profiles concurrently
@@ -50,7 +50,7 @@ describe('ProfileManager - Concurrent Operations', () => {
   }, 30000);
 
   it('should handle concurrent updates to same profile', async () => {
-    const manager = new ProfileManager(profilesPath);
+    const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
 
     // Create initial profile
     await manager.create('test', {
@@ -78,7 +78,7 @@ describe('ProfileManager - Concurrent Operations', () => {
   }, 30000);
 
   it('should handle mixed concurrent creates, updates, and deletes', async () => {
-    const manager = new ProfileManager(profilesPath);
+    const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
 
     // Pre-create some profiles
     for (let i = 0; i < 5; i++) {
@@ -131,7 +131,7 @@ describe('ProfileManager - Concurrent Operations', () => {
   }, 30000);
 
   it('should not lose data under concurrent read/write load', async () => {
-    const manager = new ProfileManager(profilesPath);
+    const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
 
     // Create initial profile
     await manager.create('counter', {

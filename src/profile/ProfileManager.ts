@@ -24,6 +24,17 @@ interface ProfilesStorage {
 export type ProfileUpdate = Partial<Omit<ProfileConfig, 'id'>>;
 
 /**
+ * Options for ProfileManager.
+ */
+export interface ProfileManagerOptions {
+  /**
+   * Disable rate limiting for testing purposes.
+   * Default: false (rate limiting enabled)
+   */
+  disableRateLimit?: boolean;
+}
+
+/**
  * Manages profile CRUD operations with persistent storage.
  * Profiles are stored in a JSON file with atomic writes.
  * All operations are protected by file-based locking to prevent race conditions.
@@ -32,17 +43,25 @@ const MAX_PROFILES = 1000;
 
 export class ProfileManager {
   private readonly lockPath: string;
-  private readonly rateLimiter: RateLimiter;
+  private readonly rateLimiter: RateLimiter | null;
 
-  constructor(private readonly profilesPath: string) {
+  constructor(
+    private readonly profilesPath: string,
+    options: ProfileManagerOptions = {}
+  ) {
     this.lockPath = `${profilesPath}.lock`;
 
     // Rate limit: 20 operations per second with burst capacity of 50
-    this.rateLimiter = new RateLimiter({
-      maxTokens: 50,
-      refillRate: 20,
-      refillInterval: 1000,
-    });
+    // Can be disabled for testing
+    if (!options.disableRateLimit) {
+      this.rateLimiter = new RateLimiter({
+        maxTokens: 50,
+        refillRate: 20,
+        refillInterval: 1000,
+      });
+    } else {
+      this.rateLimiter = null;
+    }
   }
 
   /**
@@ -96,8 +115,10 @@ export class ProfileManager {
     profileId: string,
     config: ProfileConfig
   ): Promise<ProfileRecord> {
-    // Rate limiting check
-    await this.rateLimiter.consume(1);
+    // Rate limiting check (if enabled)
+    if (this.rateLimiter) {
+      await this.rateLimiter.consume(1);
+    }
 
     // Validate all inputs before proceeding
     validateProfileId(profileId);
@@ -173,8 +194,10 @@ export class ProfileManager {
     profileId: string,
     updates: ProfileUpdate
   ): Promise<ProfileRecord> {
-    // Rate limiting check
-    await this.rateLimiter.consume(1);
+    // Rate limiting check (if enabled)
+    if (this.rateLimiter) {
+      await this.rateLimiter.consume(1);
+    }
 
     return this.withLock(async () => {
       const storage = await this.loadStorage();
@@ -205,8 +228,10 @@ export class ProfileManager {
    * @throws {RateLimitError} if rate limit exceeded
    */
   async delete(profileId: string): Promise<void> {
-    // Rate limiting check
-    await this.rateLimiter.consume(1);
+    // Rate limiting check (if enabled)
+    if (this.rateLimiter) {
+      await this.rateLimiter.consume(1);
+    }
 
     return this.withLock(async () => {
       const storage = await this.loadStorage();
