@@ -1,5 +1,6 @@
-import { appendFile, readFile, rename, stat, unlink } from 'fs/promises';
+import { appendFile, readFile, rename, stat, unlink, writeFile } from 'fs/promises';
 import { z } from 'zod';
+import * as lockfile from 'proper-lockfile';
 
 /**
  * Supported audit operations.
@@ -153,6 +154,45 @@ export class AuditLogger {
   }
 
   /**
+   * Ensure audit file exists for locking.
+   */
+  private async ensureAuditFile(): Promise<void> {
+    try {
+      await stat(this.auditPath);
+    } catch {
+      // File doesn't exist, create empty file
+      try {
+        await writeFile(this.auditPath, '', 'utf-8');
+      } catch {
+        // Another process may have created it, verify it exists
+        await stat(this.auditPath);
+      }
+    }
+  }
+
+  /**
+   * Execute rotation with file locking to prevent concurrent rotation.
+   */
+  private async withRotationLock<T>(operation: () => Promise<T>): Promise<T> {
+    await this.ensureAuditFile();
+
+    const release = await lockfile.lock(this.auditPath, {
+      retries: {
+        retries: 20,
+        minTimeout: 100,
+        maxTimeout: 1000,
+      },
+      stale: 30000,
+    });
+
+    try {
+      return await operation();
+    } finally {
+      await release();
+    }
+  }
+
+  /**
    * Check if log rotation is needed and perform it.
    */
   private async checkRotation(): Promise<void> {
@@ -160,7 +200,7 @@ export class AuditLogger {
       const stats = await stat(this.auditPath);
 
       if (stats.size >= this.maxSizeBytes) {
-        await this.rotateLog();
+        await this.withRotationLock(() => this.rotateLog());
       }
     } catch (error) {
       // File doesn't exist yet, no rotation needed
@@ -175,8 +215,19 @@ export class AuditLogger {
    * Rotate the log file.
    * Renames current log to .1, .1 to .2, etc.
    * Deletes oldest rotated file if exceeding maxRotatedFiles.
+   * MUST be called within withRotationLock().
    */
   private async rotateLog(): Promise<void> {
+    // Re-check if rotation is still needed (another process may have rotated while we waited for lock)
+    try {
+      const stats = await stat(this.auditPath);
+      if (stats.size < this.maxSizeBytes) {
+        return; // No longer needs rotation
+      }
+    } catch {
+      return; // File doesn't exist, nothing to rotate
+    }
+
     // Delete oldest rotated file if we're at the limit
     const oldestPath = `${this.auditPath}.${this.maxRotatedFiles}`;
     try {

@@ -1,4 +1,5 @@
 import { readFile } from 'fs/promises';
+import * as lockfile from 'proper-lockfile';
 import { ProfileRecord, ProfileRecordSchema, ProfileConfig } from './ProfileTypes';
 import { atomicWrite } from '../utils/atomicWrite';
 import { ValidationError } from '../errors/ValidationError';
@@ -24,13 +25,62 @@ export type ProfileUpdate = Partial<Omit<ProfileConfig, 'id'>>;
 /**
  * Manages profile CRUD operations with persistent storage.
  * Profiles are stored in a JSON file with atomic writes.
+ * All operations are protected by file-based locking to prevent race conditions.
  */
+const MAX_PROFILES = 1000;
+
 export class ProfileManager {
-  constructor(private readonly profilesPath: string) {}
+  private readonly lockPath: string;
+
+  constructor(private readonly profilesPath: string) {
+    this.lockPath = `${profilesPath}.lock`;
+  }
+
+  /**
+   * Ensure profiles file exists before locking.
+   * Safe to call concurrently - errors are ignored if file is created by another process.
+   */
+  private async ensureProfilesFile(): Promise<void> {
+    try {
+      await readFile(this.profilesPath);
+    } catch {
+      // File doesn't exist, create empty profiles file
+      try {
+        await atomicWrite(this.profilesPath, JSON.stringify({ profiles: {} }));
+      } catch {
+        // Ignore errors - another process may have created the file concurrently
+        // Verify file now exists
+        await readFile(this.profilesPath);
+      }
+    }
+  }
+
+  /**
+   * Execute an operation with file locking to prevent concurrent access.
+   */
+  private async withLock<T>(operation: () => Promise<T>): Promise<T> {
+    // Ensure file exists before acquiring lock
+    await this.ensureProfilesFile();
+
+    const release = await lockfile.lock(this.profilesPath, {
+      retries: {
+        retries: 50,
+        minTimeout: 100,
+        maxTimeout: 2000,
+      },
+      stale: 30000, // Consider lock stale after 30 seconds
+    });
+
+    try {
+      return await operation();
+    } finally {
+      await release();
+    }
+  }
 
   /**
    * Create a new profile.
-   * @throws {ValidationError} if profile with same ID already exists
+   * @throws {ValidationError} if profile with same ID already exists or max profiles limit reached
    */
   async create(
     profileId: string,
@@ -42,29 +92,43 @@ export class ProfileManager {
     validateAuth0ClientId(config.auth0ClientId);
     validatePath(config.tokenStorePath);
 
-    const storage = await this.loadStorage();
+    return this.withLock(async () => {
+      const storage = await this.loadStorage();
 
-    if (storage.profiles[profileId]) {
-      throw new ValidationError(`Profile with ID "${profileId}" already exists`, {
-        profileId,
-      });
-    }
+      if (storage.profiles[profileId]) {
+        throw new ValidationError(`Profile with ID "${profileId}" already exists`, {
+          profileId,
+        });
+      }
 
-    const now = new Date();
-    const profile: ProfileRecord = {
-      id: profileId,
-      auth0Domain: config.auth0Domain,
-      auth0ClientId: config.auth0ClientId,
-      tokenStorePath: config.tokenStorePath,
-      encryptionPassphrase: config.encryptionPassphrase,
-      createdAt: now,
-      updatedAt: now,
-    };
+      // Enforce max profiles limit
+      const profileCount = Object.keys(storage.profiles).length;
+      if (profileCount >= MAX_PROFILES) {
+        throw new ValidationError(
+          `Cannot create profile: maximum of ${MAX_PROFILES} profiles reached`,
+          {
+            currentCount: profileCount,
+            maxProfiles: MAX_PROFILES,
+          }
+        );
+      }
 
-    storage.profiles[profileId] = profile;
-    await this.saveStorage(storage);
+      const now = new Date();
+      const profile: ProfileRecord = {
+        id: profileId,
+        auth0Domain: config.auth0Domain,
+        auth0ClientId: config.auth0ClientId,
+        tokenStorePath: config.tokenStorePath,
+        encryptionPassphrase: config.encryptionPassphrase,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    return profile;
+      storage.profiles[profileId] = profile;
+      await this.saveStorage(storage);
+
+      return profile;
+    });
   }
 
   /**
@@ -72,17 +136,21 @@ export class ProfileManager {
    * @returns The profile record, or null if not found
    */
   async read(profileId: string): Promise<ProfileRecord | null> {
-    const storage = await this.loadStorage();
-    return storage.profiles[profileId] || null;
+    return this.withLock(async () => {
+      const storage = await this.loadStorage();
+      return storage.profiles[profileId] || null;
+    });
   }
 
   /**
    * List all profiles, sorted alphabetically by ID.
    */
   async list(): Promise<ProfileRecord[]> {
-    const storage = await this.loadStorage();
-    const profiles = Object.values(storage.profiles);
-    return profiles.sort((a, b) => a.id.localeCompare(b.id));
+    return this.withLock(async () => {
+      const storage = await this.loadStorage();
+      const profiles = Object.values(storage.profiles);
+      return profiles.sort((a, b) => a.id.localeCompare(b.id));
+    });
   }
 
   /**
@@ -93,27 +161,29 @@ export class ProfileManager {
     profileId: string,
     updates: ProfileUpdate
   ): Promise<ProfileRecord> {
-    const storage = await this.loadStorage();
-    const existing = storage.profiles[profileId];
+    return this.withLock(async () => {
+      const storage = await this.loadStorage();
+      const existing = storage.profiles[profileId];
 
-    if (!existing) {
-      throw new ValidationError(`Profile with ID "${profileId}" not found`, {
-        profileId,
-      });
-    }
+      if (!existing) {
+        throw new ValidationError(`Profile with ID "${profileId}" not found`, {
+          profileId,
+        });
+      }
 
-    const updated: ProfileRecord = {
-      ...existing,
-      ...updates,
-      id: profileId, // ID cannot be changed
-      createdAt: existing.createdAt, // Preserve creation time
-      updatedAt: new Date(),
-    };
+      const updated: ProfileRecord = {
+        ...existing,
+        ...updates,
+        id: profileId, // ID cannot be changed
+        createdAt: existing.createdAt, // Preserve creation time
+        updatedAt: new Date(),
+      };
 
-    storage.profiles[profileId] = updated;
-    await this.saveStorage(storage);
+      storage.profiles[profileId] = updated;
+      await this.saveStorage(storage);
 
-    return updated;
+      return updated;
+    });
   }
 
   /**
@@ -121,16 +191,18 @@ export class ProfileManager {
    * @throws {ValidationError} if profile not found
    */
   async delete(profileId: string): Promise<void> {
-    const storage = await this.loadStorage();
+    return this.withLock(async () => {
+      const storage = await this.loadStorage();
 
-    if (!storage.profiles[profileId]) {
-      throw new ValidationError(`Profile with ID "${profileId}" not found`, {
-        profileId,
-      });
-    }
+      if (!storage.profiles[profileId]) {
+        throw new ValidationError(`Profile with ID "${profileId}" not found`, {
+          profileId,
+        });
+      }
 
-    delete storage.profiles[profileId];
-    await this.saveStorage(storage);
+      delete storage.profiles[profileId];
+      await this.saveStorage(storage);
+    });
   }
 
   /**
@@ -138,32 +210,36 @@ export class ProfileManager {
    * @throws {ValidationError} if profile not found
    */
   async updateLastUsed(profileId: string): Promise<ProfileRecord> {
-    const storage = await this.loadStorage();
-    const existing = storage.profiles[profileId];
+    return this.withLock(async () => {
+      const storage = await this.loadStorage();
+      const existing = storage.profiles[profileId];
 
-    if (!existing) {
-      throw new ValidationError(`Profile with ID "${profileId}" not found`, {
-        profileId,
-      });
-    }
+      if (!existing) {
+        throw new ValidationError(`Profile with ID "${profileId}" not found`, {
+          profileId,
+        });
+      }
 
-    const updated: ProfileRecord = {
-      ...existing,
-      lastUsedAt: new Date(),
-    };
+      const updated: ProfileRecord = {
+        ...existing,
+        lastUsedAt: new Date(),
+      };
 
-    storage.profiles[profileId] = updated;
-    await this.saveStorage(storage);
+      storage.profiles[profileId] = updated;
+      await this.saveStorage(storage);
 
-    return updated;
+      return updated;
+    });
   }
 
   /**
    * Check if a profile exists.
    */
   async exists(profileId: string): Promise<boolean> {
-    const storage = await this.loadStorage();
-    return profileId in storage.profiles;
+    return this.withLock(async () => {
+      const storage = await this.loadStorage();
+      return profileId in storage.profiles;
+    });
   }
 
   /**

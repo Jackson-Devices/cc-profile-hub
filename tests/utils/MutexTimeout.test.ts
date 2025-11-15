@@ -7,12 +7,14 @@ describe('Mutex - Timeout Feature', () => {
 
     const start = Date.now();
 
+    // Only test once to avoid doubling the timeout
     await expect(mutex.acquire()).rejects.toThrow(MutexTimeoutError);
     await expect(mutex.acquire()).rejects.toThrow('Mutex acquisition timed out after 30000ms');
 
     const elapsed = Date.now() - start;
-    expect(elapsed).toBeGreaterThanOrEqual(30000);
-    expect(elapsed).toBeLessThan(32000);
+    // First acquire takes 30s, second acquire also takes 30s = 60s total
+    expect(elapsed).toBeGreaterThanOrEqual(60000);
+    expect(elapsed).toBeLessThan(62000);
   }, 70000); // Increased timeout to 70s to account for Jest overhead
 
   it('should timeout after custom timeout', async () => {

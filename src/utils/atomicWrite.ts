@@ -27,7 +27,8 @@ export async function atomicWrite(
   options: AtomicWriteOptions = {}
 ): Promise<void> {
   const { mode, encoding = 'utf-8' } = options;
-  const tempPath = `${filePath}.tmp`;
+  // Use unique temp file name to avoid conflicts in concurrent writes
+  const tempPath = `${filePath}.tmp.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
 
   // Write to temp file
   await writeFile(tempPath, content, {
