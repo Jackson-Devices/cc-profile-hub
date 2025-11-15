@@ -1,0 +1,152 @@
+# Claude Wrapper Configuration Example
+# Copy this file to 'config.yml' and customize for your environment
+
+# Path to the original Claude CLI binary
+claudePath: /usr/local/bin/claude
+
+# OAuth configuration for token refresh
+oauth:
+  # Auth0 token endpoint URL
+  tokenUrl: https://auth.anthropic.com/oauth/token
+
+  # OAuth client ID (required)
+  # Get this from your Anthropic dashboard
+  clientId: your-client-id-here
+
+  # OAuth client secret (optional, for client credentials flow)
+  # Keep this secret! Do not commit to version control
+  # clientSecret: your-client-secret-here
+
+  # OAuth scopes to request
+  scopes:
+    - user:inference
+    - user:read
+
+# Logging configuration
+logging:
+  # Log level: trace, debug, info, warn, error
+  level: info
+
+  # Redact sensitive tokens from logs (recommended for production)
+  redactTokens: true
+
+  # Enable request ID tracking for distributed tracing
+  enableRequestId: true
+
+# Token refresh configuration
+# Refresh token when it's within this many seconds of expiring
+refreshThreshold: 300  # 5 minutes
+
+# Retry configuration for token refresh
+retry:
+  # Maximum number of retry attempts
+  maxRetries: 3
+
+  # Initial delay between retries (milliseconds)
+  # Uses exponential backoff
+  minTimeout: 1000  # 1 second
+
+  # Maximum delay between retries (milliseconds)
+  maxTimeout: 30000  # 30 seconds
+
+  # Add random jitter to retry delays to avoid thundering herd
+  jitter: true
+
+# Process timeout (milliseconds)
+# Kill the Claude process if it runs longer than this
+# 0 = no timeout
+processTimeout: 1800000  # 30 minutes
+
+# Profile storage
+profiles:
+  # Path to profiles file
+  path: ~/.claude-wrapper/profiles.json
+
+  # Maximum number of profiles allowed
+  maxProfiles: 1000
+
+# Token storage
+tokens:
+  # Directory to store OAuth tokens
+  path: ~/.claude-wrapper/tokens
+
+  # File permissions for token files (octal)
+  mode: 0600  # Owner read/write only
+
+# Audit logging
+audit:
+  # Enable audit logging
+  enabled: true
+
+  # Path to audit log file
+  path: ~/.claude-wrapper/audit.log
+
+  # Log rotation settings
+  rotation:
+    # Maximum log file size before rotation (bytes)
+    maxSize: 10485760  # 10 MB
+
+    # Number of rotated files to keep
+    maxFiles: 5
+
+# Rate limiting (optional - disable for testing/development)
+rateLimit:
+  # Enable rate limiting
+  enabled: true
+
+  # Maximum burst capacity (tokens)
+  maxTokens: 50
+
+  # Refill rate (tokens per interval)
+  refillRate: 20
+
+  # Refill interval (milliseconds)
+  refillInterval: 1000  # 1 second
+
+# Backup configuration
+backup:
+  # Enable automatic backups
+  enabled: true
+
+  # Backup directory
+  path: ~/.claude-wrapper/backups
+
+  # Number of backups to keep
+  keepCount: 7
+
+  # Backup schedule (cron format)
+  # Daily at 2 AM
+  schedule: "0 2 * * *"
+
+# Health check configuration
+health:
+  # Enable health check endpoint
+  enabled: false
+
+  # Port for health check HTTP server
+  port: 9090
+
+# Metrics configuration
+metrics:
+  # Enable metrics collection
+  enabled: true
+
+  # Maximum number of metrics to keep in memory
+  maxMetrics: 1000
+
+  # Maximum age of metrics (milliseconds)
+  maxAge: 3600000  # 1 hour
+
+  # Enable Prometheus metrics export
+  prometheus:
+    enabled: false
+    port: 9091
+    path: /metrics
+
+# Environment-specific overrides
+# These can also be set via environment variables:
+# - CLAUDE_PATH
+# - OAUTH_CLIENT_ID
+# - OAUTH_CLIENT_SECRET
+# - OAUTH_TOKEN_URL
+# - LOG_LEVEL

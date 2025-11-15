@@ -1,4 +1,4 @@
-import { writeFile, rename, stat } from 'fs/promises';
+import { writeFile, rename, stat, open } from 'fs/promises';
 
 export interface AtomicWriteOptions {
   /**
@@ -10,6 +10,12 @@ export interface AtomicWriteOptions {
    * File encoding. Defaults to 'utf-8'.
    */
   encoding?: BufferEncoding;
+  /**
+   * Force data to disk with fsync before rename.
+   * This ensures durability at the cost of performance.
+   * Default: true for production safety.
+   */
+  fsync?: boolean;
 }
 
 /**
@@ -26,7 +32,7 @@ export async function atomicWrite(
   content: string,
   options: AtomicWriteOptions = {}
 ): Promise<void> {
-  const { mode, encoding = 'utf-8' } = options;
+  const { mode, encoding = 'utf-8', fsync: doFsync = true } = options;
   // Use unique temp file name to avoid conflicts in concurrent writes
   const tempPath = `${filePath}.tmp.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
 
@@ -35,6 +41,16 @@ export async function atomicWrite(
     encoding,
     ...(mode !== undefined && { mode }),
   });
+
+  // fsync to ensure data is on disk before rename
+  if (doFsync) {
+    const fd = await open(tempPath, 'r+');
+    try {
+      await fd.sync();
+    } finally {
+      await fd.close();
+    }
+  }
 
   // Atomic rename
   await rename(tempPath, filePath);
