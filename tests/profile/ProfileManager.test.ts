@@ -64,7 +64,7 @@ describe('ProfileManager', () => {
       await manager.create('work', config);
 
       await expect(manager.create('work', config)).rejects.toThrow(
-        'Profile with ID "work" already exists'
+        'Profile already exists'
       );
     });
 
@@ -197,7 +197,7 @@ describe('ProfileManager', () => {
     it('should throw error when updating non-existent profile', async () => {
       await expect(
         manager.update('nonexistent', { auth0Domain: 'new.auth0.com' })
-      ).rejects.toThrow('Profile with ID "nonexistent" not found');
+      ).rejects.toThrow('Profile not found');
     });
 
     it('should preserve createdAt timestamp', async () => {
@@ -234,7 +234,7 @@ describe('ProfileManager', () => {
 
     it('should throw error when deleting non-existent profile', async () => {
       await expect(manager.delete('nonexistent')).rejects.toThrow(
-        'Profile with ID "nonexistent" not found'
+        'Profile not found'
       );
     });
 
@@ -276,7 +276,7 @@ describe('ProfileManager', () => {
 
     it('should throw error when updating non-existent profile', async () => {
       await expect(manager.updateLastUsed('nonexistent')).rejects.toThrow(
-        'Profile with ID "nonexistent" not found'
+        'Profile not found'
       );
     });
   });

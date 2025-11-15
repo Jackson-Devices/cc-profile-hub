@@ -39,58 +39,42 @@ const DANGEROUS_PATHS = [
 export function validateProfileId(profileId: string): void {
   // Check empty
   if (!profileId || profileId.trim().length === 0) {
-    throw new ValidationError('Profile ID cannot be empty', {
-      profileId,
-    });
+    throw new ValidationError('Profile ID cannot be empty');
   }
 
   // Check length
   if (profileId.length > 64) {
     throw new ValidationError('Profile ID cannot exceed 64 characters', {
-      profileId,
       length: profileId.length,
     });
   }
 
   // Check for path traversal sequences
   if (profileId.includes('..') || profileId.includes('./') || profileId === '.') {
-    throw new ValidationError('Profile ID cannot contain path traversal sequences', {
-      profileId,
-    });
+    throw new ValidationError('Profile ID cannot contain path traversal sequences');
   }
 
   // Check for absolute paths
   if (profileId.startsWith('/') || profileId.startsWith('\\')) {
-    throw new ValidationError('Profile ID cannot be an absolute path', {
-      profileId,
-    });
+    throw new ValidationError('Profile ID cannot be an absolute path');
   }
 
   // Check for Windows paths (contains : or starts with \\)
   if (profileId.includes(':') || profileId.startsWith('\\\\')) {
-    throw new ValidationError('Profile ID cannot contain Windows path separators', {
-      profileId,
-    });
+    throw new ValidationError('Profile ID cannot contain Windows path separators');
   }
 
   // Check for Windows reserved names (case-insensitive)
   const upperProfileId = profileId.toUpperCase();
   if (WINDOWS_RESERVED_NAMES.includes(upperProfileId)) {
-    throw new ValidationError('Profile ID cannot be a Windows reserved name', {
-      profileId,
-      reservedName: upperProfileId,
-    });
+    throw new ValidationError('Profile ID cannot be a Windows reserved name');
   }
 
   // Check allowed characters: alphanumeric, hyphen, underscore
   const validPattern = /^[a-zA-Z0-9_-]+$/;
   if (!validPattern.test(profileId)) {
     throw new ValidationError(
-      'Profile ID can only contain alphanumeric characters, hyphens, and underscores',
-      {
-        profileId,
-        invalidChars: profileId.match(/[^a-zA-Z0-9_-]/g),
-      }
+      'Profile ID can only contain alphanumeric characters, hyphens, and underscores'
     );
   }
 }
@@ -108,7 +92,7 @@ export function validateProfileId(profileId: string): void {
 export function validatePath(path: string): void {
   // Check empty
   if (!path || path.trim().length === 0) {
-    throw new ValidationError('Path cannot be empty', { path });
+    throw new ValidationError('Path cannot be empty');
   }
 
   // Check for Windows absolute paths (C:\ etc) or Unix absolute paths (/)
@@ -116,16 +100,12 @@ export function validatePath(path: string): void {
   const isUnixAbsolute = path.startsWith('/');
 
   if (!isWindowsAbsolute && !isUnixAbsolute) {
-    throw new ValidationError('Path must be absolute', {
-      path,
-    });
+    throw new ValidationError('Path must be absolute');
   }
 
   // Check for UNC paths
   if (path.startsWith('\\\\')) {
-    throw new ValidationError('UNC network paths are not allowed', {
-      path,
-    });
+    throw new ValidationError('UNC network paths are not allowed');
   }
 
   // Normalize and check for path traversal
@@ -134,10 +114,7 @@ export function validatePath(path: string): void {
 
   // After normalization, check if we ended up in a parent directory
   if (normalized.includes('..')) {
-    throw new ValidationError('Path contains traversal sequences', {
-      path,
-      normalized,
-    });
+    throw new ValidationError('Path contains traversal sequences');
   }
 
   // Check against dangerous paths (check both original and resolved)
@@ -145,19 +122,13 @@ export function validatePath(path: string): void {
     // Check resolved path
     if (resolved.startsWith(dangerousPath) ||
         resolved.toLowerCase().startsWith(dangerousPath.toLowerCase())) {
-      throw new ValidationError('Path is in a protected system directory', {
-        path,
-        dangerousPath,
-      });
+      throw new ValidationError('Path is in a protected system directory');
     }
 
     // Also check original path (for Windows paths on Linux)
     if (path.startsWith(dangerousPath) ||
         path.toLowerCase().startsWith(dangerousPath.toLowerCase())) {
-      throw new ValidationError('Path is in a protected system directory', {
-        path,
-        dangerousPath,
-      });
+      throw new ValidationError('Path is in a protected system directory');
     }
   }
 }
@@ -173,27 +144,22 @@ export function validatePath(path: string): void {
  */
 export function validateAuth0Domain(domain: string): void {
   if (!domain || domain.trim().length === 0) {
-    throw new ValidationError('Auth0 domain cannot be empty', { domain });
+    throw new ValidationError('Auth0 domain cannot be empty');
   }
 
   // Check for XSS attempts
   if (domain.includes('<') || domain.includes('>') || domain.includes('javascript:')) {
-    throw new ValidationError('Auth0 domain contains invalid characters', {
-      domain,
-    });
+    throw new ValidationError('Auth0 domain contains invalid characters');
   }
 
   // Basic domain validation (alphanumeric, dots, hyphens)
   const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
   if (!domainPattern.test(domain)) {
-    throw new ValidationError('Auth0 domain format is invalid', {
-      domain,
-    });
+    throw new ValidationError('Auth0 domain format is invalid');
   }
 
   if (domain.length > 255) {
     throw new ValidationError('Auth0 domain is too long', {
-      domain,
       length: domain.length,
     });
   }
@@ -210,20 +176,17 @@ export function validateAuth0Domain(domain: string): void {
  */
 export function validateAuth0ClientId(clientId: string): void {
   if (!clientId || clientId.trim().length === 0) {
-    throw new ValidationError('Auth0 client ID cannot be empty', { clientId });
+    throw new ValidationError('Auth0 client ID cannot be empty');
   }
 
   // Auth0 client IDs are typically alphanumeric with some special chars
   const clientIdPattern = /^[a-zA-Z0-9_-]+$/;
   if (!clientIdPattern.test(clientId)) {
-    throw new ValidationError('Auth0 client ID contains invalid characters', {
-      clientId,
-    });
+    throw new ValidationError('Auth0 client ID contains invalid characters');
   }
 
   if (clientId.length > 128) {
     throw new ValidationError('Auth0 client ID is too long', {
-      clientId,
       length: clientId.length,
     });
   }

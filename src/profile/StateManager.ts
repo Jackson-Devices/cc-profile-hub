@@ -32,28 +32,48 @@ export class StateManager {
   /**
    * Switch to a different profile atomically.
    * Updates both state and the profile's lastUsedAt timestamp.
+   * Uses a two-phase approach: save state first, then update profile.
+   * If profile update fails, the state is left pointing to the new profile
+   * (which is safe since the profile exists, just the timestamp wasn't updated).
+   *
    * @throws {ValidationError} if profile doesn't exist
    */
   async switchTo(profileId: string): Promise<WrapperState> {
-    // Verify profile exists (will throw if not)
+    // Verify profile exists first (will throw if not)
     const exists = await this.profileManager.exists(profileId);
     if (!exists) {
       // Let ProfileManager's updateLastUsed throw the proper error
       await this.profileManager.updateLastUsed(profileId);
     }
 
-    // Update profile's lastUsedAt
-    await this.profileManager.updateLastUsed(profileId);
+    // Save old state for potential rollback
+    const oldState = await this.loadState();
 
-    // Update state
+    // Create new state
     const newState: WrapperState = {
       currentProfileId: profileId,
       lastSwitchedAt: new Date(),
     };
 
-    await this.saveState(newState);
+    try {
+      // Phase 1: Save state first
+      await this.saveState(newState);
 
-    return newState;
+      // Phase 2: Update profile's lastUsedAt
+      // If this fails, state is still valid (points to existing profile)
+      await this.profileManager.updateLastUsed(profileId);
+
+      return newState;
+    } catch (error) {
+      // Rollback state on failure
+      try {
+        await this.saveState(oldState);
+      } catch {
+        // If rollback fails, log but don't throw (original error is more important)
+        // In production, this should be logged
+      }
+      throw error;
+    }
   }
 
   /**

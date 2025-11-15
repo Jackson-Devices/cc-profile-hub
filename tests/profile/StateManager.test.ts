@@ -129,7 +129,7 @@ describe('StateManager', () => {
 
     it('should throw error when switching to non-existent profile', async () => {
       await expect(stateManager.switchTo('nonexistent')).rejects.toThrow(
-        'Profile with ID "nonexistent" not found'
+        'Profile not found'
       );
     });
 

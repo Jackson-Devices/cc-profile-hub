@@ -9,6 +9,7 @@ import {
   validateAuth0Domain,
   validateAuth0ClientId,
 } from '../utils/InputValidator';
+import { RateLimiter } from '../utils/RateLimiter';
 
 /**
  * Storage structure for profiles on disk.
@@ -31,9 +32,17 @@ const MAX_PROFILES = 1000;
 
 export class ProfileManager {
   private readonly lockPath: string;
+  private readonly rateLimiter: RateLimiter;
 
   constructor(private readonly profilesPath: string) {
     this.lockPath = `${profilesPath}.lock`;
+
+    // Rate limit: 20 operations per second with burst capacity of 50
+    this.rateLimiter = new RateLimiter({
+      maxTokens: 50,
+      refillRate: 20,
+      refillInterval: 1000,
+    });
   }
 
   /**
@@ -81,11 +90,15 @@ export class ProfileManager {
   /**
    * Create a new profile.
    * @throws {ValidationError} if profile with same ID already exists or max profiles limit reached
+   * @throws {RateLimitError} if rate limit exceeded
    */
   async create(
     profileId: string,
     config: ProfileConfig
   ): Promise<ProfileRecord> {
+    // Rate limiting check
+    await this.rateLimiter.consume(1);
+
     // Validate all inputs before proceeding
     validateProfileId(profileId);
     validateAuth0Domain(config.auth0Domain);
@@ -96,9 +109,7 @@ export class ProfileManager {
       const storage = await this.loadStorage();
 
       if (storage.profiles[profileId]) {
-        throw new ValidationError(`Profile with ID "${profileId}" already exists`, {
-          profileId,
-        });
+        throw new ValidationError('Profile already exists');
       }
 
       // Enforce max profiles limit
@@ -156,19 +167,21 @@ export class ProfileManager {
   /**
    * Update a profile's configuration.
    * @throws {ValidationError} if profile not found
+   * @throws {RateLimitError} if rate limit exceeded
    */
   async update(
     profileId: string,
     updates: ProfileUpdate
   ): Promise<ProfileRecord> {
+    // Rate limiting check
+    await this.rateLimiter.consume(1);
+
     return this.withLock(async () => {
       const storage = await this.loadStorage();
       const existing = storage.profiles[profileId];
 
       if (!existing) {
-        throw new ValidationError(`Profile with ID "${profileId}" not found`, {
-          profileId,
-        });
+        throw new ValidationError('Profile not found');
       }
 
       const updated: ProfileRecord = {
@@ -189,15 +202,17 @@ export class ProfileManager {
   /**
    * Delete a profile.
    * @throws {ValidationError} if profile not found
+   * @throws {RateLimitError} if rate limit exceeded
    */
   async delete(profileId: string): Promise<void> {
+    // Rate limiting check
+    await this.rateLimiter.consume(1);
+
     return this.withLock(async () => {
       const storage = await this.loadStorage();
 
       if (!storage.profiles[profileId]) {
-        throw new ValidationError(`Profile with ID "${profileId}" not found`, {
-          profileId,
-        });
+        throw new ValidationError('Profile not found');
       }
 
       delete storage.profiles[profileId];
@@ -215,9 +230,7 @@ export class ProfileManager {
       const existing = storage.profiles[profileId];
 
       if (!existing) {
-        throw new ValidationError(`Profile with ID "${profileId}" not found`, {
-          profileId,
-        });
+        throw new ValidationError('Profile not found');
       }
 
       const updated: ProfileRecord = {

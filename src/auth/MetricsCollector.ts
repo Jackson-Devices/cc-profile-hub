@@ -25,14 +25,30 @@ export interface MetricsFilter {
 
 export interface MetricsCollectorOptions {
   maxMetrics?: number;
+  /**
+   * Maximum age of metrics in milliseconds before they are automatically cleaned up.
+   * Default: 1 hour (3600000ms)
+   */
+  maxAge?: number;
 }
 
 export class MetricsCollector {
   private metrics: RefreshMetric[] = [];
   private readonly maxMetrics: number;
+  private readonly maxAge: number;
+  private readonly cleanupInterval: NodeJS.Timeout;
 
   constructor(options: MetricsCollectorOptions = {}) {
     this.maxMetrics = options.maxMetrics || 1000;
+    this.maxAge = options.maxAge || 3600000; // 1 hour default
+
+    // Periodically clean up old metrics
+    this.cleanupInterval = setInterval(() => {
+      this.cleanup();
+    }, 60000); // Clean up every minute
+
+    // Allow Node to exit even if cleanup is pending
+    this.cleanupInterval.unref();
   }
 
   recordRefresh(metric: RefreshMetric): void {
@@ -42,6 +58,24 @@ export class MetricsCollector {
     if (this.metrics.length > this.maxMetrics) {
       this.metrics = this.metrics.slice(this.metrics.length - this.maxMetrics);
     }
+  }
+
+  /**
+   * Remove metrics older than maxAge.
+   */
+  private cleanup(): void {
+    const now = Date.now();
+    const cutoff = now - this.maxAge;
+    this.metrics = this.metrics.filter((m) => m.timestamp >= cutoff);
+  }
+
+  /**
+   * Stop the cleanup interval.
+   * Call this when shutting down to prevent memory leaks.
+   */
+  destroy(): void {
+    clearInterval(this.cleanupInterval);
+    this.metrics = [];
   }
 
   getMetrics(filter?: MetricsFilter): RefreshMetric[] {
