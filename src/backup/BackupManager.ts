@@ -166,7 +166,7 @@ export class BackupManager {
 
     // Generate filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = name ? `${name}-${timestamp}.backup.json` : `backup-${timestamp}.json`;
+    const filename = name ? `${name}-${timestamp}.backup.json` : `backup-${timestamp}.backup.json`;
     const backupPath = join(this.backupDir, filename);
 
     // Write backup file
