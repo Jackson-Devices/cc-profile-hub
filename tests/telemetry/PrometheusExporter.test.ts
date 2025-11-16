@@ -84,7 +84,7 @@ describe('PrometheusExporter', () => {
         latencyMs: 100,
         retryCount: 0,
         timestamp: Date.now(),
-        
+        profileId: 'test',
       });
 
       metricsCollector.recordRefresh({
@@ -92,7 +92,7 @@ describe('PrometheusExporter', () => {
         latencyMs: 200,
         retryCount: 0,
         timestamp: Date.now(),
-        
+        profileId: 'test',
       });
 
       metricsCollector.recordRefresh({
@@ -100,7 +100,7 @@ describe('PrometheusExporter', () => {
         latencyMs: 300,
         retryCount: 0,
         timestamp: Date.now(),
-        
+        profileId: 'test',
       });
 
       const output = exporter.exportMetrics();

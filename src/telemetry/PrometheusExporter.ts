@@ -24,7 +24,7 @@ export class PrometheusExporter {
     // Token refresh latency (average)
     metrics.push('# HELP token_refresh_latency_ms_avg Average latency of token refresh operations in milliseconds');
     metrics.push('# TYPE token_refresh_latency_ms_avg gauge');
-    metrics.push(`token_refresh_latency_ms_avg ${stats.averageLatency}`);
+    metrics.push(`token_refresh_latency_ms_avg ${stats.averageLatencyMs}`);
     metrics.push('');
 
     // Token refresh total retries
@@ -36,7 +36,7 @@ export class PrometheusExporter {
     // Token refresh total attempts
     metrics.push('# HELP token_refresh_attempts_total Total number of token refresh attempts');
     metrics.push('# TYPE token_refresh_attempts_total counter');
-    metrics.push(`token_refresh_attempts_total ${stats.totalAttempts}`);
+    metrics.push(`token_refresh_attempts_total ${stats.totalRefreshes}`);
     metrics.push('');
 
     // Token refresh successes
