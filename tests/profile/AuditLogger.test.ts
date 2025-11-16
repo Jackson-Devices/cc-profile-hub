@@ -1,4 +1,4 @@
-import { AuditLogger, AuditOperation } from '../../src/profile/AuditLogger';
+import { AuditLogger } from '../../src/profile/AuditLogger';
 import { mkdir, rm, readFile, stat, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

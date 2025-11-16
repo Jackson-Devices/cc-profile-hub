@@ -52,7 +52,6 @@ describe('ProfileManager - Stress Tests', () => {
     const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
 
     // Try to create 1100 profiles sequentially (100 more than limit)
-    let successCount = 0;
     for (let i = 0; i < 1100; i++) {
       try {
         await manager.create(`profile-${i}`, {
@@ -60,8 +59,7 @@ describe('ProfileManager - Stress Tests', () => {
           auth0ClientId: `client-${i}`,
           tokenStorePath: '/home/user/tokens',
         });
-        successCount++;
-      } catch (error) {
+      } catch {
         // Expected to fail for some due to limit
       }
     }

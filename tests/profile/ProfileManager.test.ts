@@ -1,5 +1,4 @@
 import { ProfileManager } from '../../src/profile/ProfileManager';
-import { ProfileRecord } from '../../src/profile/ProfileTypes';
 import { mkdir, rm, readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

@@ -1,5 +1,5 @@
 import { ValidationError } from '../errors/ValidationError';
-import { resolve, isAbsolute, normalize } from 'path';
+import { resolve, normalize } from 'path';
 
 /**
  * Windows reserved device names that cannot be used as filenames.

@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, readdir, stat } from 'fs/promises';
+import { readFile, mkdir, readdir, stat } from 'fs/promises';
 import { join, basename } from 'path';
 import { createHash } from 'crypto';
 import { Logger } from '../utils/Logger';

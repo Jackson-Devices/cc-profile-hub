@@ -313,7 +313,7 @@ export class ProfileManager {
 
       // Invalid structure, return empty
       return { profiles: {} };
-    } catch (error) {
+    } catch {
       // File doesn't exist or is corrupted, return empty storage
       return { profiles: {} };
     }
