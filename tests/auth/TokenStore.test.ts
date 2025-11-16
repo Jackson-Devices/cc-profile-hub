@@ -159,7 +159,13 @@ describe('TokenStore Write', () => {
     // Extract file mode (permissions) - mask out file type bits
     const mode = stats.mode & 0o777;
 
-    // Expect 0600 (owner read/write only)
-    expect(mode).toBe(0o600);
+    // On Unix-like systems, expect 0600 (owner read/write only)
+    // On Windows, permissions are handled differently by the OS
+    if (process.platform !== 'win32') {
+      expect(mode).toBe(0o600);
+    } else {
+      // On Windows, just verify the file exists and is readable
+      expect(stats.isFile()).toBe(true);
+    }
   });
 });

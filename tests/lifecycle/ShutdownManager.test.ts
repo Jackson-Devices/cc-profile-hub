@@ -8,6 +8,8 @@ describe('ShutdownManager', () => {
     manager = new ShutdownManager();
     // Mock process.exit to prevent test runner from exiting
     mockExit = jest.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    // Clear any previous calls
+    mockExit.mockClear();
   });
 
   afterEach(() => {
@@ -16,7 +18,7 @@ describe('ShutdownManager', () => {
   });
 
   describe('register', () => {
-    it('should register a resource for cleanup', () => {
+    it('should register a resource for cleanup', async () => {
       const resource = {
         name: 'test-resource',
         cleanup: jest.fn(),
@@ -25,19 +27,19 @@ describe('ShutdownManager', () => {
       manager.register(resource);
 
       // Verify resource is registered by triggering shutdown
-      manager.shutdown('TEST');
+      await manager.shutdown('TEST');
 
       expect(resource.cleanup).toHaveBeenCalled();
     });
 
-    it('should allow registering multiple resources', () => {
+    it('should allow registering multiple resources', async () => {
       const resource1 = { name: 'resource1', cleanup: jest.fn() };
       const resource2 = { name: 'resource2', cleanup: jest.fn() };
 
       manager.register(resource1);
       manager.register(resource2);
 
-      manager.shutdown('TEST');
+      await manager.shutdown('TEST');
 
       expect(resource1.cleanup).toHaveBeenCalled();
       expect(resource2.cleanup).toHaveBeenCalled();
@@ -155,17 +157,20 @@ describe('ShutdownManager', () => {
   });
 
   describe('clear', () => {
-    it('should remove all registered resources', () => {
+    it('should remove all registered resources', async () => {
       const resource = { name: 'test', cleanup: jest.fn() };
       manager.register(resource);
 
       manager.clear();
-      manager.shutdown('TEST');
+      await manager.shutdown('TEST');
 
       expect(resource.cleanup).not.toHaveBeenCalled();
     });
 
     it('should reset shutdown in progress flag', async () => {
+      // Clear any previous calls from other tests
+      mockExit.mockClear();
+
       const cleanup = jest.fn();
       manager.register({ name: 'test', cleanup });
 

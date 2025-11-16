@@ -1,5 +1,5 @@
 import { ValidationError } from '../errors/ValidationError';
-import { resolve, normalize } from 'path';
+import { resolve } from 'path';
 
 /**
  * Windows reserved device names that cannot be used as filenames.
@@ -108,14 +108,14 @@ export function validatePath(path: string): void {
     throw new ValidationError('UNC network paths are not allowed');
   }
 
-  // Normalize and check for path traversal
-  const normalized = normalize(path);
-  const resolved = resolve(path);
-
-  // After normalization, check if we ended up in a parent directory
-  if (normalized.includes('..')) {
+  // Check for path traversal BEFORE normalization
+  // This catches cases like /home/../../etc/passwd
+  if (path.includes('..')) {
     throw new ValidationError('Path contains traversal sequences');
   }
+
+  // Resolve for additional checks
+  const resolved = resolve(path);
 
   // Check against dangerous paths (check both original and resolved)
   for (const dangerousPath of DANGEROUS_PATHS) {

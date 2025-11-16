@@ -55,8 +55,9 @@ export async function atomicWrite(
   // Atomic rename
   await rename(tempPath, filePath);
 
-  // Verify permissions if mode was specified
-  if (mode !== undefined) {
+  // Verify permissions if mode was specified (Unix-like systems only)
+  // Windows doesn't support Unix-style file permissions
+  if (mode !== undefined && process.platform !== 'win32') {
     const stats = await stat(filePath);
     const actualMode = stats.mode & 0o777;
     if (actualMode !== mode) {
