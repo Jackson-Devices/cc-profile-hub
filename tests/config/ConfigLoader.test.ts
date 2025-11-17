@@ -1,4 +1,5 @@
 import { ConfigLoader } from '../../src/config/ConfigLoader';
+import { ConfigError } from '../../src/errors/ConfigError';
 import { join } from 'path';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -39,6 +40,7 @@ oauth:
   it('should throw on missing config file', async () => {
     const loader = new ConfigLoader('/nonexistent/config.yml');
 
+    await expect(loader.load()).rejects.toThrow(ConfigError);
     await expect(loader.load()).rejects.toThrow(/not found/);
   });
 
@@ -48,7 +50,18 @@ oauth:
 
     const loader = new ConfigLoader(configPath);
 
+    await expect(loader.load()).rejects.toThrow(ConfigError);
     await expect(loader.load()).rejects.toThrow(/YAML/);
+  });
+
+  it('should rethrow non-ENOENT errors (e.g., EISDIR)', async () => {
+    const dirPath = join(tempDir, 'config-is-a-dir.yml');
+    mkdirSync(dirPath, { recursive: true });
+
+    const loader = new ConfigLoader(dirPath);
+
+    // Should throw EISDIR error (trying to read a directory as a file)
+    await expect(loader.load()).rejects.toThrow();
   });
 });
 
@@ -67,7 +80,9 @@ describe('ConfigLoader Environment Overrides', () => {
     // Clean up env vars
     delete process.env.CC_WRAPPER_CLAUDE_PATH;
     delete process.env.CC_WRAPPER_OAUTH_CLIENT_ID;
+    delete process.env.CC_WRAPPER_OAUTH_TOKEN_URL;
     delete process.env.CC_WRAPPER_REFRESH_THRESHOLD;
+    delete process.env.CC_WRAPPER_LOG_LEVEL;
   });
 
   it('should override claudePath from env', async () => {
@@ -130,5 +145,149 @@ refreshThreshold: 600
 
     expect(config.refreshThreshold).toBe(120);
     expect(config.oauth.clientId).toBe('file-client'); // unchanged
+  });
+
+  it('should override oauth tokenUrl from env', async () => {
+    const configPath = join(tempDir, 'config.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: default-client
+`
+    );
+
+    process.env.CC_WRAPPER_OAUTH_TOKEN_URL = 'https://custom-oauth.example.com/token';
+
+    const loader = new ConfigLoader(configPath);
+    const config = await loader.load();
+
+    expect(config.oauth.tokenUrl).toBe('https://custom-oauth.example.com/token');
+    expect(config.oauth.clientId).toBe('default-client'); // unchanged
+  });
+
+  it('should override log level from env', async () => {
+    const configPath = join(tempDir, 'config.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: default-client
+logging:
+  level: info
+`
+    );
+
+    process.env.CC_WRAPPER_LOG_LEVEL = 'debug';
+
+    const loader = new ConfigLoader(configPath);
+    const config = await loader.load();
+
+    expect(config.logging.level).toBe('debug');
+  });
+
+  it('should handle multiple env overrides simultaneously', async () => {
+    const configPath = join(tempDir, 'config.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: default-client
+refreshThreshold: 600
+logging:
+  level: info
+`
+    );
+
+    process.env.CC_WRAPPER_CLAUDE_PATH = '/custom/claude';
+    process.env.CC_WRAPPER_OAUTH_CLIENT_ID = 'custom-client';
+    process.env.CC_WRAPPER_OAUTH_TOKEN_URL = 'https://custom.example.com/token';
+    process.env.CC_WRAPPER_REFRESH_THRESHOLD = '300';
+    process.env.CC_WRAPPER_LOG_LEVEL = 'trace';
+
+    const loader = new ConfigLoader(configPath);
+    const config = await loader.load();
+
+    expect(config.claudePath).toBe('/custom/claude');
+    expect(config.oauth.clientId).toBe('custom-client');
+    expect(config.oauth.tokenUrl).toBe('https://custom.example.com/token');
+    expect(config.refreshThreshold).toBe(300);
+    expect(config.logging.level).toBe('trace');
+  });
+
+  it('should preserve oauth config when adding tokenUrl override', async () => {
+    const configPath = join(tempDir, 'config.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: original-client
+  scopes: ['user:inference', 'user:profile']
+`
+    );
+
+    process.env.CC_WRAPPER_OAUTH_TOKEN_URL = 'https://new-url.example.com/token';
+
+    const loader = new ConfigLoader(configPath);
+    const config = await loader.load();
+
+    expect(config.oauth.tokenUrl).toBe('https://new-url.example.com/token');
+    expect(config.oauth.clientId).toBe('original-client');
+    expect(config.oauth.scopes).toEqual(['user:inference', 'user:profile']);
+  });
+});
+
+describe('ConfigLoader YAML Error Handling', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = join(tmpdir(), `config-test-${Date.now()}`);
+    mkdirSync(tempDir, { recursive: true });
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+    jest.restoreAllMocks();
+  });
+
+  it('should handle non-Error YAML parsing exceptions', async () => {
+    const configPath = join(tempDir, 'test.yml');
+    writeFileSync(
+      configPath,
+      `
+claudePath: /usr/bin/claude
+oauth:
+  tokenUrl: https://api.anthropic.com/oauth/token
+  clientId: test-client
+`
+    );
+
+    // Mock js-yaml before importing ConfigLoader
+    jest.doMock('js-yaml', () => ({
+      load: (): never => {
+        throw 'String error instead of Error object';
+      },
+    }));
+
+    // Import ConfigLoader with mocked js-yaml
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ConfigLoader: MockedConfigLoader } = require('../../src/config/ConfigLoader');
+    const loader = new MockedConfigLoader(configPath);
+
+    await expect(loader.load()).rejects.toThrow(/Invalid YAML in config file: Unknown error/);
+
+    // Clean up mock
+    jest.dontMock('js-yaml');
   });
 });
