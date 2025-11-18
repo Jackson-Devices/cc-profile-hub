@@ -7,6 +7,7 @@ import { AuthError } from '../errors/AuthError';
 import { NetworkError } from '../errors/NetworkError';
 import { RateLimiter } from '../utils/RateLimiter';
 import { CircuitBreaker } from '../utils/CircuitBreaker';
+import { DeviceFingerprint } from '../utils/DeviceFingerprint';
 
 export interface TokenRefresherOptions {
   retryPolicy?: Partial<RetryPolicy>;
@@ -127,7 +128,7 @@ export class TokenRefresher {
           grantedAt: now,
           scopes: data.scope.split(' '),
           tokenType: data.token_type as 'Bearer',
-          deviceFingerprint: this.generateFingerprint(),
+          deviceFingerprint: await this.generateFingerprint(),
         };
       } catch (error: any) {
         lastError = error;
@@ -186,8 +187,8 @@ export class TokenRefresher {
     );
   }
 
-  private generateFingerprint(): string {
-    // Simple fingerprint for now
-    return `${process.platform}-${process.version}`;
+  private async generateFingerprint(): Promise<string> {
+    // Generate secure device fingerprint using multiple machine-specific identifiers
+    return await DeviceFingerprint.generate();
   }
 }
