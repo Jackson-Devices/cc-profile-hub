@@ -86,6 +86,7 @@ export function validateProfileId(profileId: string): void {
  * - Not contain path traversal after normalization
  * - Not be dangerous system paths
  * - Not be UNC paths (\\network\share)
+ * - Not contain null bytes
  *
  * @throws {ValidationError} if validation fails
  */
@@ -93,6 +94,11 @@ export function validatePath(path: string): void {
   // Check empty
   if (!path || path.trim().length === 0) {
     throw new ValidationError('Path cannot be empty');
+  }
+
+  // SECURITY: Check for null byte injection (bypasses OS-level path checks)
+  if (path.includes('\0') || path.includes('\x00')) {
+    throw new ValidationError('Path contains null bytes (security violation)');
   }
 
   // Check for Windows absolute paths (C:\ etc) or Unix absolute paths (/)
@@ -195,6 +201,28 @@ export function validateAuth0ClientId(clientId: string): void {
 }
 
 /**
+ * Common weak passphrases that should never be used for encryption.
+ * These are easily guessable and would enable brute-force attacks.
+ */
+const COMMON_WEAK_PASSPHRASES = [
+  'password',
+  'Password',
+  'PASSWORD',
+  'pass1234',
+  'password1',
+  'password123',
+  'admin123',
+  'letmein',
+  'welcome',
+  'qwerty',
+  'qwerty123',
+  '12345678',
+  '123456789',
+  'abcdefgh',
+  'passphrase',
+];
+
+/**
  * Validate an encryption passphrase.
  * SECURITY CRITICAL: Protects encrypted credentials!
  * Passphrases must be:
@@ -202,6 +230,7 @@ export function validateAuth0ClientId(clientId: string): void {
  * - Maximum 1024 characters
  * - Not empty or whitespace-only
  * - Not purely numeric (weak)
+ * - Not a common weak passphrase
  *
  * @throws {ValidationError} if validation fails
  */
@@ -235,5 +264,10 @@ export function validateEncryptionPassphrase(passphrase: string | undefined): vo
   // Reject purely numeric passphrases (weak)
   if (/^\d+$/.test(passphrase)) {
     throw new ValidationError('Encryption passphrase cannot be purely numeric (too weak)');
+  }
+
+  // SECURITY: Reject common weak passphrases (dictionary attack prevention)
+  if (COMMON_WEAK_PASSPHRASES.includes(passphrase)) {
+    throw new ValidationError('Encryption passphrase is too common (easily guessable)');
   }
 }
