@@ -1,8 +1,9 @@
-import { readFile, writeFile, mkdir, readdir, stat } from 'fs/promises';
-import { join, basename } from 'path';
+import { readFile, writeFile, mkdir, readdir, stat, lstat } from 'fs/promises';
+import { join, basename, resolve } from 'path';
 import { createHash } from 'crypto';
 import { Logger } from '../utils/Logger';
 import { atomicWrite } from '../utils/atomicWrite';
+import { validatePath } from '../utils/InputValidator';
 
 /**
  * Metadata about a backup.
@@ -106,6 +107,13 @@ export class BackupManager {
   private readonly BACKUP_VERSION = '1.0.0';
 
   constructor(options: BackupManagerOptions) {
+    // Validate all paths to prevent path traversal attacks
+    validatePath(options.backupDir);
+    validatePath(options.profilesPath);
+    if (options.auditLogPath) {
+      validatePath(options.auditLogPath);
+    }
+
     this.backupDir = options.backupDir;
     this.profilesPath = options.profilesPath;
     this.auditLogPath = options.auditLogPath;
@@ -172,7 +180,7 @@ export class BackupManager {
     // Write backup file
     await atomicWrite(backupPath, JSON.stringify(backupData, null, 2));
 
-    const stat = await this.stat(backupPath);
+    const stat = await this.getFileStat(backupPath);
     this.logger.info(`Backup created: ${backupPath} (${stat.sizeBytes} bytes)`);
 
     return backupPath;
@@ -189,6 +197,9 @@ export class BackupManager {
   ): Promise<void> {
     this.logger.info(`Restoring from backup: ${backupPath}`);
 
+    // SECURITY: Check for symlink attacks before reading
+    await this.checkSymlink(backupPath);
+
     // Read and validate backup
     const backupData = await this.readBackup(backupPath);
     const isValid = await this.validateBackup(backupData);
@@ -200,6 +211,12 @@ export class BackupManager {
     if (options.validateOnly) {
       this.logger.info('Validation successful (validate-only mode)');
       return;
+    }
+
+    // SECURITY: Verify restore destinations before writing
+    await this.checkSymlink(this.profilesPath);
+    if (this.auditLogPath) {
+      await this.checkSymlink(this.auditLogPath);
     }
 
     // Restore profiles
@@ -308,7 +325,7 @@ export class BackupManager {
    */
   private async getBackupMetadata(backupPath: string): Promise<BackupMetadata> {
     const backupData = await this.readBackup(backupPath);
-    const fileStat = await this.stat(backupPath);
+    const fileStat = await this.getFileStat(backupPath);
 
     return {
       filename: basename(backupPath),
@@ -321,9 +338,28 @@ export class BackupManager {
   }
 
   /**
+   * Check if a path is a symlink and throw error if it is.
+   * Prevents symlink attacks where attacker creates symlink to sensitive file.
+   */
+  private async checkSymlink(path: string): Promise<void> {
+    try {
+      const stats = await lstat(path);
+      if (stats.isSymbolicLink()) {
+        throw new Error(`Security: Refusing to operate on symlink: ${path}`);
+      }
+    } catch (error) {
+      // File doesn't exist yet - that's OK for writes
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return;
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Get file stats.
    */
-  private async stat(path: string): Promise<{ sizeBytes: number }> {
+  private async getFileStat(path: string): Promise<{ sizeBytes: number }> {
     const stats = await stat(path);
     return { sizeBytes: stats.size };
   }

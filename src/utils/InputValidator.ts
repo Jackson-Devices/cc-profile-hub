@@ -147,21 +147,23 @@ export function validateAuth0Domain(domain: string): void {
     throw new ValidationError('Auth0 domain cannot be empty');
   }
 
+  // SECURITY: Check length BEFORE regex to prevent ReDoS
+  if (domain.length > 255) {
+    throw new ValidationError('Auth0 domain is too long', {
+      length: domain.length,
+    });
+  }
+
   // Check for XSS attempts
   if (domain.includes('<') || domain.includes('>') || domain.includes('javascript:')) {
     throw new ValidationError('Auth0 domain contains invalid characters');
   }
 
   // Basic domain validation (alphanumeric, dots, hyphens)
-  const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
+  // SECURITY: Safer regex - limits middle section to prevent backtracking
+  const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,253}[a-zA-Z0-9])?$/;
   if (!domainPattern.test(domain)) {
     throw new ValidationError('Auth0 domain format is invalid');
-  }
-
-  if (domain.length > 255) {
-    throw new ValidationError('Auth0 domain is too long', {
-      length: domain.length,
-    });
   }
 }
 

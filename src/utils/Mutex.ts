@@ -10,6 +10,7 @@ interface QueueEntry {
   resolve: (release: Release) => void;
   reject: (error: Error) => void;
   timeoutId?: NodeJS.Timeout;
+  timedOut?: boolean; // Flag to prevent double-resolution
 }
 
 /**
@@ -91,16 +92,19 @@ export class Mutex {
       // Set up timeout if enabled
       if (this.timeoutMs > 0) {
         timeoutId = setTimeout(() => {
-          // Remove this entry from queue
+          // Remove this entry from queue and mark as timed out
           const index = this.queue.findIndex((entry) => entry.timeoutId === timeoutId);
           if (index !== -1) {
+            const entry = this.queue[index];
             this.queue.splice(index, 1);
+            // SECURITY: Mark as timed out to prevent double-resolution
+            entry.timedOut = true;
           }
           reject(new MutexTimeoutError(this.timeoutMs));
         }, this.timeoutMs);
       }
 
-      this.queue.push({ resolve, reject, timeoutId });
+      this.queue.push({ resolve, reject, timeoutId, timedOut: false });
     });
   }
 
@@ -152,6 +156,14 @@ export class Mutex {
       // Process next in queue, if any
       const next = this.queue.shift();
       if (next) {
+        // SECURITY: Check if entry has already timed out (race condition)
+        if (next.timedOut) {
+          // Entry timed out, skip to next waiter recursively
+          const dummyRelease = this.createRelease();
+          dummyRelease(); // Process next waiter
+          return;
+        }
+
         // Clear timeout for this waiter
         if (next.timeoutId) {
           clearTimeout(next.timeoutId);

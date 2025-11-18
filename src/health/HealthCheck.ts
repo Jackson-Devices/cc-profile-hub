@@ -102,6 +102,8 @@ export class HealthCheck {
   private logger: Logger;
   private version?: string;
   private startTime: number;
+  private profilesPath: string;
+  private tokenStorePath: string;
 
   constructor(options: HealthCheckOptions) {
     this.profileManager = new ProfileManager(options.profilesPath);
@@ -109,6 +111,8 @@ export class HealthCheck {
     this.logger = options.logger || new Logger({ level: "info" });
     this.version = options.version;
     this.startTime = Date.now();
+    this.profilesPath = options.profilesPath;
+    this.tokenStorePath = options.tokenStorePath;
   }
 
   /**
@@ -230,7 +234,7 @@ export class HealthCheck {
       const { dirname } = await import('path');
 
       // Check if profiles path directory is writable
-      const profilesDir = dirname(this.profileManager['profilesPath']);
+      const profilesDir = dirname(this.profilesPath);
       await access(profilesDir, constants.W_OK | constants.R_OK);
 
       return {

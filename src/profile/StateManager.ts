@@ -2,16 +2,22 @@ import { readFile } from 'fs/promises';
 import { WrapperState, WrapperStateSchema } from './ProfileTypes';
 import { ProfileManager } from './ProfileManager';
 import { atomicWrite } from '../utils/atomicWrite';
+import { Logger } from '../utils/Logger';
 
 /**
  * Manages wrapper state (current active profile) with atomic operations.
  * Works in conjunction with ProfileManager to track profile usage.
  */
 export class StateManager {
+  private readonly logger: Logger;
+
   constructor(
     private readonly statePath: string,
-    private readonly profileManager: ProfileManager
-  ) {}
+    private readonly profileManager: ProfileManager,
+    logger?: Logger
+  ) {
+    this.logger = logger || new Logger({ level: 'info' });
+  }
 
   /**
    * Get the current active profile ID.
@@ -68,9 +74,18 @@ export class StateManager {
       // Rollback state on failure
       try {
         await this.saveState(oldState);
-      } catch {
-        // If rollback fails, log but don't throw (original error is more important)
-        // In production, this should be logged
+        this.logger.warn('Rolled back state after profile switch failure', {
+          attemptedProfile: profileId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } catch (rollbackError) {
+        // CRITICAL: Rollback failed - state may be inconsistent
+        this.logger.error('CRITICAL: Rollback failed during profile switch', {
+          attemptedProfile: profileId,
+          currentState: newState,
+          error: error instanceof Error ? error.message : String(error),
+          rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+        });
       }
       throw error;
     }

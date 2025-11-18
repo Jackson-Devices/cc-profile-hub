@@ -5,6 +5,8 @@ import { DEFAULT_RETRY_POLICY, shouldRetry, sleep, RetryPolicy, applyJitter } fr
 import { MetricsCollector } from './MetricsCollector';
 import { AuthError } from '../errors/AuthError';
 import { NetworkError } from '../errors/NetworkError';
+import { networkInterfaces, hostname } from 'os';
+import { createHash } from 'crypto';
 
 export interface TokenRefresherOptions {
   retryPolicy?: Partial<RetryPolicy>;
@@ -152,7 +154,22 @@ export class TokenRefresher {
   }
 
   private generateFingerprint(): string {
-    // Simple fingerprint for now
-    return `${process.platform}-${process.version}`;
+    // Generate a more secure device fingerprint to detect token theft
+    const components = [
+      process.platform,
+      process.arch,
+      hostname(),
+      JSON.stringify(networkInterfaces()),
+      process.env.USER || process.env.USERNAME || 'unknown',
+      process.version,
+    ];
+
+    // Hash the components for privacy and consistency
+    const hash = createHash('sha256')
+      .update(components.join('|'))
+      .digest('hex')
+      .substring(0, 16);
+
+    return `${process.platform}-${hash}`;
   }
 }

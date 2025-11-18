@@ -72,24 +72,30 @@ export class AuditLogger {
   /**
    * Log an audit entry.
    * Automatically rotates the log if it exceeds max size.
+   * SECURITY: Uses file locking to prevent concurrent append corruption.
    */
   async log(
     operation: AuditOperation,
     profileId: string,
     metadata?: Record<string, unknown>
   ): Promise<void> {
+    // SECURITY: Sanitize profileId to prevent log injection attacks
+    const sanitizedProfileId = profileId.replace(/[\n\r\t]/g, '_');
+
     const entry: AuditEntry = {
       timestamp: new Date().toISOString(),
       operation,
-      profileId,
+      profileId: sanitizedProfileId,
       ...(metadata && { metadata }),
     };
 
-    // Append entry as JSON line
-    const line = JSON.stringify(entry) + '\n';
-    await appendFile(this.auditPath, line, 'utf-8');
+    // Append entry as JSON line with file locking
+    await this.withLogLock(async () => {
+      const line = JSON.stringify(entry) + '\n';
+      await appendFile(this.auditPath, line, 'utf-8');
+    });
 
-    // Check if rotation is needed
+    // Check if rotation is needed (already has its own locking)
     await this.checkRotation();
   }
 
@@ -167,6 +173,29 @@ export class AuditLogger {
         // Another process may have created it, verify it exists
         await stat(this.auditPath);
       }
+    }
+  }
+
+  /**
+   * Execute log operation with file locking to prevent concurrent append corruption.
+   * Uses shorter retry timeouts than rotation since logging is more frequent.
+   */
+  private async withLogLock<T>(operation: () => Promise<T>): Promise<T> {
+    await this.ensureAuditFile();
+
+    const release = await lockfile.lock(this.auditPath, {
+      retries: {
+        retries: 10,
+        minTimeout: 50,
+        maxTimeout: 500,
+      },
+      stale: 5000, // Shorter stale timeout for log operations
+    });
+
+    try {
+      return await operation();
+    } finally {
+      await release();
     }
   }
 

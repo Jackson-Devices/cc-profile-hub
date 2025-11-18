@@ -194,6 +194,17 @@ export class ProfileManager {
     profileId: string,
     updates: ProfileUpdate
   ): Promise<ProfileRecord> {
+    // SECURITY: Validate all update fields before applying
+    if (updates.auth0Domain !== undefined) {
+      validateAuth0Domain(updates.auth0Domain);
+    }
+    if (updates.auth0ClientId !== undefined) {
+      validateAuth0ClientId(updates.auth0ClientId);
+    }
+    if (updates.tokenStorePath !== undefined) {
+      validatePath(updates.tokenStorePath);
+    }
+
     // Rate limiting check (if enabled)
     if (this.rateLimiter) {
       await this.rateLimiter.consume(1);
