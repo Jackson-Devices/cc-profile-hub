@@ -22,4 +22,8 @@ export class Config {
   get refreshThreshold(): number {
     return this.data.refreshThreshold;
   }
+
+  get rateLimiting(): ConfigData['rateLimiting'] {
+    return this.data.rateLimiting;
+  }
 }

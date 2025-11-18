@@ -15,6 +15,20 @@ export const ConfigSchema = z.object({
     .optional()
     .default(() => ({ level: 'info' as const, redactTokens: true })),
   refreshThreshold: z.number().min(60).default(300), // seconds before expiry
+  rateLimiting: z
+    .object({
+      enabled: z.boolean().default(true),
+      maxTokens: z.number().min(1).default(10),
+      refillRate: z.number().min(1).default(1),
+      refillInterval: z.number().min(1000).default(60000),
+    })
+    .optional()
+    .default(() => ({
+      enabled: true,
+      maxTokens: 10,
+      refillRate: 1,
+      refillInterval: 60000,
+    })),
 });
 
 export type ConfigData = z.infer<typeof ConfigSchema>;

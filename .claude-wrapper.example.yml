@@ -26,3 +26,15 @@ logging:
 # Refresh threshold: refresh tokens this many seconds before expiry (default: 300)
 # This ensures your token is always fresh
 refreshThreshold: 300
+
+# Rate limiting configuration (optional)
+# Prevents abuse and protects shared OAuth endpoints
+rateLimiting:
+  # Enable rate limiting (default: true)
+  enabled: true
+  # Maximum number of refresh attempts allowed in the bucket (default: 10)
+  maxTokens: 10
+  # Rate at which tokens refill (default: 1 per minute)
+  refillRate: 1
+  # Interval for refilling tokens in milliseconds (default: 60000 = 1 minute)
+  refillInterval: 60000

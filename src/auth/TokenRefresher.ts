@@ -5,10 +5,12 @@ import { DEFAULT_RETRY_POLICY, shouldRetry, sleep, RetryPolicy, applyJitter } fr
 import { MetricsCollector } from './MetricsCollector';
 import { AuthError } from '../errors/AuthError';
 import { NetworkError } from '../errors/NetworkError';
+import { RateLimiter } from '../utils/RateLimiter';
 
 export interface TokenRefresherOptions {
   retryPolicy?: Partial<RetryPolicy>;
   metricsCollector?: MetricsCollector;
+  rateLimiter?: RateLimiter;
 }
 
 /**
@@ -20,6 +22,7 @@ export interface TokenRefresherOptions {
  * - Token rotation support (handles new refresh_token from server)
  * - Optional metrics collection for monitoring and debugging
  * - Profile-based tracking for multi-profile scenarios
+ * - Optional rate limiting to prevent OAuth endpoint abuse
  *
  * Token Rotation:
  * OAuth 2.0 servers may rotate refresh tokens for security. This class
@@ -46,13 +49,28 @@ export interface TokenRefresherOptions {
 export class TokenRefresher {
   private retryPolicy: RetryPolicy;
   private metricsCollector?: MetricsCollector;
+  private rateLimiter?: RateLimiter;
 
   constructor(private config: RefreshConfig, options?: TokenRefresherOptions) {
     this.retryPolicy = { ...DEFAULT_RETRY_POLICY, ...options?.retryPolicy };
     this.metricsCollector = options?.metricsCollector;
+    this.rateLimiter = options?.rateLimiter;
   }
 
   async refresh(refreshToken: string, scopes: string[], profileId: string = 'default'): Promise<TokenData> {
+    // Check and consume rate limit token before attempting refresh
+    if (this.rateLimiter) {
+      try {
+        await this.rateLimiter.consume(1);
+      } catch (error) {
+        // Rate limit exceeded
+        throw new AuthError(
+          'Rate limit exceeded for token refresh. Please wait before retrying.',
+          { profileId, rateLimitExceeded: true }
+        );
+      }
+    }
+
     const startTime = Date.now();
     let attempt = 0;
     let lastError: any;

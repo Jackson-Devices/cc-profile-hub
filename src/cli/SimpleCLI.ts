@@ -4,6 +4,7 @@ import { EncryptedTokenStore } from '../auth/EncryptedTokenStore';
 import { ConfigLoader } from '../config/ConfigLoader';
 import { Logger } from '../utils/Logger';
 import { ClaudeWrapper } from '../wrapper/ClaudeWrapper';
+import { RateLimiter } from '../utils/RateLimiter';
 import { homedir } from 'os';
 import { join } from 'path';
 import axios from 'axios';
@@ -156,6 +157,15 @@ export class SimpleCLI {
     const tokenStore = this.createTokenStore();
     const metricsCollector = new MetricsCollector();
 
+    // Create rate limiter if enabled
+    const rateLimiter = config.rateLimiting?.enabled
+      ? new RateLimiter({
+          maxTokens: config.rateLimiting.maxTokens,
+          refillRate: config.rateLimiting.refillRate,
+          refillInterval: config.rateLimiting.refillInterval,
+        })
+      : undefined;
+
     const refresher = new TokenRefresher(
       {
         httpClient: axios.create(),
@@ -164,6 +174,7 @@ export class SimpleCLI {
       },
       {
         metricsCollector,
+        rateLimiter,
       }
     );
 
