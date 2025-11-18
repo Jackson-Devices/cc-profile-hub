@@ -261,4 +261,24 @@ describe('DeviceFingerprint', () => {
       expect(fingerprint.length).toBeGreaterThan(50);
     });
   });
+
+  describe('machine ID caching', () => {
+    it('should cache machine ID across multiple calls', async () => {
+      // First call reads and caches the machine ID
+      const fingerprint1 = await DeviceFingerprint.generate();
+
+      // Second call should use cached machine ID (tests cache hit path)
+      const fingerprint2 = await DeviceFingerprint.generate();
+
+      // Both should have the same machine ID hash (6th component)
+      const parts1 = fingerprint1.split('-');
+      const parts2 = fingerprint2.split('-');
+
+      // Machine ID hash is at index 5
+      expect(parts1[5]).toBe(parts2[5]);
+
+      // Instance IDs should be the same (same process)
+      expect(parts1[6]).toBe(parts2[6]);
+    });
+  });
 });
