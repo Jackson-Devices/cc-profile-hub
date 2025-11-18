@@ -101,9 +101,35 @@ export function validatePath(path: string): void {
     throw new ValidationError('Path contains null bytes (security violation)');
   }
 
+  // SECURITY: Check for URL-encoded path traversal attempts
+  // Decode common URL encodings that could bypass validation
+  const urlEncodedPatterns = [
+    '%2e%2e',  // ..
+    '%2e%2e%2f', // ../
+    '%2e%2e%5c', // ..\
+    '..%2f',   // ../
+    '..%5c',   // ..\
+    '%2e%2e/',
+    '%2e%2e\\',
+  ];
+
+  const lowerPath = path.toLowerCase();
+  for (const pattern of urlEncodedPatterns) {
+    if (lowerPath.includes(pattern)) {
+      throw new ValidationError('Path contains URL-encoded traversal sequences (security violation)');
+    }
+  }
+
   // Check for Windows absolute paths (C:\ etc) or Unix absolute paths (/)
   const isWindowsAbsolute = /^[a-zA-Z]:\\/.test(path);
   const isUnixAbsolute = path.startsWith('/');
+
+  // SECURITY: Block URI schemes (file://, http://, etc.)
+  // But allow Windows paths like C:\\ (not C://)
+  // Check AFTER determining path type
+  if (/:\/\//.test(path) && !isWindowsAbsolute) {
+    throw new ValidationError('Path contains URI scheme (security violation)');
+  }
 
   if (!isWindowsAbsolute && !isUnixAbsolute) {
     throw new ValidationError('Path must be absolute');

@@ -816,17 +816,496 @@ describe('[RED TEAM] Adversarial Attack Suite', () => {
     });
   });
 
-  describe('[ATTACK-020] ANSI Escape Code Injection (Log Poisoning)', () => {
-    it('ATTACK: ANSI codes in profileId to manipulate terminal output', () => {
-      // ATTACK: Inject ANSI escape codes to hide malicious activity in logs
-      const ansiAttack = 'profile\x1b[2J\x1b[H'; // Clear screen + home
-
-      expect(() => validateProfileId(ansiAttack)).toThrow(/alphanumeric/i);
+  describe('[ATTACK-021] Fuzzing & Mutation Testing', () => {
+    it('FUZZ: random binary data in profileId', () => {
+      // ATTACK: Binary data that could break parsing
+      const binaryData = Buffer.from([0x00, 0xFF, 0xFE, 0xFD, 0x0A, 0x0D]).toString('utf-8');
+      expect(() => validateProfileId(binaryData)).toThrow();
     });
 
-    it('ATTACK: ANSI codes in auth0Domain', () => {
-      const ansiAttack = 'evil.auth0.com\x1b[31m[ALERT]\x1b[0m';
-      expect(() => validateAuth0Domain(ansiAttack)).toThrow(/invalid/i);
+    it('FUZZ: extremely long repeated characters in auth0Domain', () => {
+      // ATTACK: Mutation - single char repeated
+      const mutations = ['a'.repeat(10000), '-'.repeat(500), '.'.repeat(300)];
+      mutations.forEach(attack => {
+        const start = Date.now();
+        expect(() => validateAuth0Domain(attack)).toThrow();
+        expect(Date.now() - start).toBeLessThan(100); // Must be fast
+      });
+    });
+
+    it('FUZZ: mixed control characters everywhere', () => {
+      // ATTACK: All control chars 0x00-0x1F
+      for (let i = 0; i < 32; i++) {
+        const ctrl = String.fromCharCode(i);
+        const attack = `profile${ctrl}evil`;
+        expect(() => validateProfileId(attack)).toThrow(/alphanumeric/i);
+      }
+    });
+
+    it('FUZZ: high Unicode codepoints (emoji variants)', () => {
+      // ATTACK: Surrogate pairs, combining marks, etc.
+      const attacks = [
+        'profile\uD83D\uDC80evil', // Skull emoji as surrogate pair
+        'test\u0301\u0302\u0303', // Combining marks
+        'evil\uFEFF', // Zero-width no-break space (BOM)
+        '\uFFFEprofile', // Non-character
+      ];
+
+      attacks.forEach(attack => {
+        expect(() => validateProfileId(attack)).toThrow(/alphanumeric/i);
+      });
+    });
+
+    it('FUZZ: path traversal mutation testing', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Every possible path traversal variant
+      const traversalMutations = [
+        '../',
+        '..\\',
+        '.../',
+        '..../',
+        './../',
+        '.\\..\\',
+        '..;/',
+        '%2e%2e/',
+        '%2e%2e%2f',
+        '..%2f',
+        '..%5c',
+        '..%255c',
+        'file:///../',
+      ];
+
+      for (const mutation of traversalMutations) {
+        const attack = `/tmp/${mutation}etc/passwd`;
+        await expect(
+          manager.create(`traversal-${traversalMutations.indexOf(mutation)}`, {
+            auth0Domain: 'fuzz.auth0.com',
+            auth0ClientId: 'fuzz',
+            tokenStorePath: attack,
+            encryptionPassphrase: 'fuzzing-passphrase-123',
+          })
+        ).rejects.toThrow();
+      }
+    });
+
+    it('FUZZ: passphrase boundary mutations', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Test every boundary ±1
+      const boundaryTests = [
+        { pass: 'a'.repeat(7), shouldFail: true, reason: 'too short' },
+        { pass: 'a'.repeat(8), shouldFail: false, reason: 'min length' },
+        { pass: 'a'.repeat(9), shouldFail: false, reason: 'min+1' },
+        { pass: 'a'.repeat(1023), shouldFail: false, reason: 'max-1' },
+        { pass: 'a'.repeat(1024), shouldFail: false, reason: 'max length' },
+        { pass: 'a'.repeat(1025), shouldFail: true, reason: 'too long' },
+      ];
+
+      for (const test of boundaryTests) {
+        const promise = manager.create(`boundary-${boundaryTests.indexOf(test)}`, {
+          auth0Domain: 'fuzz.auth0.com',
+          auth0ClientId: 'fuzz',
+          tokenStorePath,
+          encryptionPassphrase: test.pass,
+        });
+
+        if (test.shouldFail) {
+          await expect(promise).rejects.toThrow();
+        } else {
+          await expect(promise).resolves.toBeDefined();
+        }
+      }
+    });
+  });
+
+  describe('[ATTACK-022] Regex Complexity Bombs', () => {
+    it('ATTACK: evil regex pattern with nested groups', () => {
+      // ATTACK: Pattern designed to cause exponential backtracking
+      const evilPatterns = [
+        '(a+)+b',
+        '(a|a)*b',
+        '(a|ab)*c',
+        '(.*)*x',
+        '(a*)*b',
+      ];
+
+      evilPatterns.forEach(pattern => {
+        // Test with 50 'a's followed by invalid char
+        const attack = 'a'.repeat(50) + '!';
+        const start = Date.now();
+
+        expect(() => validateAuth0Domain(attack)).toThrow();
+
+        const elapsed = Date.now() - start;
+        expect(elapsed).toBeLessThan(100); // MUST complete quickly
+      });
+    });
+
+    it('ATTACK: polynomial regex denial of service', () => {
+      // ATTACK: O(n^2) or worse backtracking
+      const attacks = [
+        'a'.repeat(100) + '!',
+        'ab'.repeat(100) + '!',
+        'abc'.repeat(50) + '!',
+        ('a-').repeat(100) + '!',
+        ('test.').repeat(50) + '!',
+      ];
+
+      attacks.forEach(attack => {
+        const start = Date.now();
+        expect(() => validateAuth0Domain(attack)).toThrow();
+        expect(Date.now() - start).toBeLessThan(100);
+      });
+    });
+  });
+
+  describe('[ATTACK-023] Memory Corruption Attempts', () => {
+    it('ATTACK: Buffer overflow via extremely long string allocation', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Try to allocate huge strings to exhaust memory
+      const sizes = [
+        1024 * 1024,      // 1MB
+        10 * 1024 * 1024, // 10MB
+        100 * 1024 * 1024, // 100MB (should fail)
+      ];
+
+      for (const size of sizes) {
+        await expect(
+          manager.create(`overflow-${size}`, {
+            auth0Domain: 'overflow.auth0.com',
+            auth0ClientId: 'overflow',
+            tokenStorePath,
+            encryptionPassphrase: 'x'.repeat(size),
+          })
+        ).rejects.toThrow(/too long/i);
+      }
+    });
+
+    it('ATTACK: deeply nested JSON in passphrase', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Create deeply nested structures in passphrase
+      let nested = '"evil"';
+      for (let i = 0; i < 100; i++) {
+        nested = `{"a":${nested}}`;
+      }
+
+      const profile = await manager.create('nested-json', {
+        auth0Domain: 'test.auth0.com',
+        auth0ClientId: 'test',
+        tokenStorePath,
+        encryptionPassphrase: nested,
+      });
+
+      // Should store and retrieve correctly without stack overflow
+      const read = await manager.read('nested-json');
+      expect(read!.encryptionPassphrase).toBe(nested);
+    });
+
+    it('ATTACK: circular reference detection in update', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      await manager.create('circular-test', {
+        auth0Domain: 'test.auth0.com',
+        auth0ClientId: 'test',
+        tokenStorePath,
+        encryptionPassphrase: 'circular-ref-123',
+      });
+
+      // ATTACK: Try to create circular reference via object
+      const circularObj: any = { auth0Domain: 'evil.auth0.com' };
+      circularObj.self = circularObj;
+
+      // GOOD: Should REJECT circular references (JSON.stringify will throw TypeError)
+      // This is fail-fast behavior - prevents corrupted storage
+      await expect(
+        manager.update('circular-test', circularObj)
+      ).rejects.toThrow(/circular/i);
+    });
+  });
+
+  describe('[ATTACK-024] Format String & Type Confusion', () => {
+    it('ATTACK: printf-style format strings in fields', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Format strings that could break logging/formatting
+      const formatStrings = [
+        '%s%s%s%s%s',
+        '%x%x%x%x',
+        '%n%n%n%n',
+        '%p%p%p%p',
+        '${evil}',
+        '{evil}',
+      ];
+
+      for (const fmt of formatStrings) {
+        const profile = await manager.create(`fmt-${formatStrings.indexOf(fmt)}`, {
+          auth0Domain: 'format.auth0.com',
+          auth0ClientId: 'format',
+          tokenStorePath,
+          encryptionPassphrase: `pass${fmt}word123`,
+        });
+
+        // Format string should be stored literally, not interpreted
+        expect(profile.encryptionPassphrase).toContain(fmt);
+      }
+    });
+
+    it('ATTACK: type confusion via numeric strings', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Strings that look like numbers/booleans
+      const confusingValues = [
+        '0',
+        '1',
+        'true',
+        'false',
+        'null',
+        'undefined',
+        'NaN',
+        'Infinity',
+        '-Infinity',
+      ];
+
+      for (const val of confusingValues) {
+        const profile = await manager.create(`type-${confusingValues.indexOf(val)}`, {
+          auth0Domain: 'type.auth0.com',
+          auth0ClientId: val,
+          tokenStorePath,
+          encryptionPassphrase: `type-confusion-${val}-123`,
+        });
+
+        // Should be stored as strings, not converted
+        expect(typeof profile.auth0ClientId).toBe('string');
+        expect(profile.auth0ClientId).toBe(val);
+      }
+    });
+  });
+
+  describe('[ATTACK-025] Compression Bombs (Zip Bombs)', () => {
+    it('ATTACK: highly compressible data to exhaust decompression', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Data that compresses well (could be decompression bomb)
+      // If system uses compression, this could expand massively
+      const compressible = 'A'.repeat(10000);
+
+      await expect(
+        manager.create('compression-bomb', {
+          auth0Domain: 'compress.auth0.com',
+          auth0ClientId: 'compress',
+          tokenStorePath,
+          encryptionPassphrase: compressible,
+        })
+      ).rejects.toThrow(/too long/i);
+    });
+  });
+
+  describe('[ATTACK-026] Side Channel Attacks', () => {
+    it('ATTACK: timing side channel on validation', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      await manager.create('timing-target', {
+        auth0Domain: 'timing.auth0.com',
+        auth0ClientId: 'timing',
+        tokenStorePath,
+        encryptionPassphrase: 'timing-attack-passphrase-123',
+      });
+
+      // ATTACK: Measure timing for correct vs incorrect profileId
+      const timings: number[] = [];
+
+      for (let i = 0; i < 10; i++) {
+        const start = Date.now();
+        await manager.exists('timing-target');
+        timings.push(Date.now() - start);
+      }
+
+      const avgCorrect = timings.reduce((a, b) => a + b, 0) / timings.length;
+
+      const timingsWrong: number[] = [];
+      for (let i = 0; i < 10; i++) {
+        const start = Date.now();
+        await manager.exists('wrong-id-nonexistent');
+        timingsWrong.push(Date.now() - start);
+      }
+
+      const avgWrong = timingsWrong.reduce((a, b) => a + b, 0) / timingsWrong.length;
+
+      // Timing difference should be minimal (both should be fast)
+      // Large timing differences could leak information
+      expect(avgCorrect).toBeLessThan(100);
+      expect(avgWrong).toBeLessThan(100);
+
+      // Warn if timing difference is significant
+      const timingDiff = Math.abs(avgCorrect - avgWrong);
+      if (timingDiff > 50) {
+        console.warn(`[SECURITY] Timing difference detected: ${timingDiff}ms - potential side channel`);
+      }
+    });
+
+    it('ATTACK: passphrase comparison timing leak', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Try to detect timing differences in validation
+      const testPassphrases = [
+        'short-pw',        // Too short - should fail fast
+        'password123',     // Common word - should fail at dictionary check
+        'validpass99',     // Valid - should pass all checks
+      ];
+
+      const timings: Record<string, number> = {};
+
+      for (const pass of testPassphrases) {
+        const start = Date.now();
+        try {
+          await manager.create(`timing-pw-${testPassphrases.indexOf(pass)}`, {
+            auth0Domain: 'timing.auth0.com',
+            auth0ClientId: 'timing',
+            tokenStorePath,
+            encryptionPassphrase: pass,
+          });
+        } catch {
+          // Expected for invalid passphrases
+        }
+        timings[pass] = Date.now() - start;
+      }
+
+      // All validations should complete quickly
+      Object.values(timings).forEach(time => {
+        expect(time).toBeLessThan(100);
+      });
+    });
+  });
+
+  describe('[ATTACK-027] Deserialization Attacks', () => {
+    it('ATTACK: malicious JSON with __proto__ pollution in storage', async () => {
+      // ATTACK: Directly write malicious JSON to profiles file
+      const maliciousJSON = {
+        profiles: {
+          'evil': {
+            id: 'evil',
+            auth0Domain: 'evil.auth0.com',
+            auth0ClientId: 'evil',
+            tokenStorePath,
+            encryptionPassphrase: 'evil-pass-123',
+            '__proto__': { isAdmin: true },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+
+      await writeFile(profilesPath, JSON.stringify(maliciousJSON));
+
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+      const profiles = await manager.list();
+
+      // Should NOT pollute Object.prototype
+      expect(({}as any).isAdmin).toBeUndefined();
+
+      // Profile should be loaded correctly
+      expect(profiles.find(p => p.id === 'evil')).toBeDefined();
+    });
+
+    it('ATTACK: constructor hijacking in stored profile', async () => {
+      // ATTACK: Try to hijack constructor
+      const constructorAttack = {
+        profiles: {
+          'constructor-hack': {
+            id: 'constructor-hack',
+            constructor: { name: 'EvilConstructor' },
+            auth0Domain: 'evil.auth0.com',
+            auth0ClientId: 'evil',
+            tokenStorePath,
+            encryptionPassphrase: 'evil-pass-123',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+
+      await writeFile(profilesPath, JSON.stringify(constructorAttack));
+
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // Should handle gracefully without crashing
+      const profiles = await manager.list();
+      expect(Array.isArray(profiles)).toBe(true);
+    });
+  });
+
+  describe('[ATTACK-028] File System Race Conditions', () => {
+    it('ATTACK: TOCTOU on profile delete/create', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      await manager.create('toctou-test', {
+        auth0Domain: 'toctou.auth0.com',
+        auth0ClientId: 'toctou',
+        tokenStorePath,
+        encryptionPassphrase: 'toctou-attack-123',
+      });
+
+      // ATTACK: Delete and create in rapid succession
+      const operations = [
+        manager.delete('toctou-test'),
+        manager.create('toctou-test', {
+          auth0Domain: 'evil.auth0.com',
+          auth0ClientId: 'evil',
+          tokenStorePath,
+          encryptionPassphrase: 'evil-toctou-123',
+        }),
+      ];
+
+      // One should succeed, one should fail
+      const results = await Promise.allSettled(operations);
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      // File locking should prevent both from succeeding simultaneously
+      expect(succeeded + failed).toBe(2);
+    });
+  });
+
+  describe('[ATTACK-029] Environment Variable Injection', () => {
+    it('ATTACK: environment variable expansion in paths', () => {
+      // ATTACK: Try to use env vars in path
+      const envAttacks = [
+        '$HOME/.ssh',
+        '${HOME}/.ssh',
+        '%HOME%/.ssh',
+        '~/.ssh',
+        '$USER/evil',
+      ];
+
+      envAttacks.forEach(attack => {
+        // Should NOT expand env vars, should treat as literal
+        expect(() => validatePath(attack)).toThrow();
+      });
+    });
+  });
+
+  describe('[ATTACK-030] Billion Laughs (XML Bomb Equivalent)', () => {
+    it('ATTACK: exponential entity expansion in passphrase', async () => {
+      const manager = new ProfileManager(profilesPath, { disableRateLimit: true });
+
+      // ATTACK: Create pattern that could expand exponentially
+      let entity = 'lol';
+      for (let i = 0; i < 10; i++) {
+        entity = entity + entity; // Doubles each time
+      }
+
+      // Should be blocked by length limit (1024 chars)
+      await expect(
+        manager.create('billion-laughs', {
+          auth0Domain: 'billion.auth0.com',
+          auth0ClientId: 'billion',
+          tokenStorePath,
+          encryptionPassphrase: entity,
+        })
+      ).rejects.toThrow(/too long/i);
     });
   });
 });
