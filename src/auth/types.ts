@@ -1,7 +1,7 @@
-import { AxiosInstance } from 'axios';
+import { HttpClient } from '../http/HttpClient';
 
 export interface RefreshConfig {
-  httpClient: AxiosInstance;
+  httpClient: HttpClient;
   tokenUrl: string;
   clientId: string;
   clientSecret?: string;

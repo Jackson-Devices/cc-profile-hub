@@ -6,6 +6,7 @@ import { Logger } from '../utils/Logger';
 import { ClaudeWrapper } from '../wrapper/ClaudeWrapper';
 import { RateLimiter } from '../utils/RateLimiter';
 import { CircuitBreaker } from '../utils/CircuitBreaker';
+import { AxiosHttpClient } from '../http/AxiosHttpClient';
 import { homedir } from 'os';
 import { join } from 'path';
 import axios from 'axios';
@@ -177,9 +178,12 @@ export class SimpleCLI {
         })
       : undefined;
 
+    // Create HTTP client with platform-agnostic wrapper
+    const httpClient = new AxiosHttpClient(axios.create());
+
     const refresher = new TokenRefresher(
       {
-        httpClient: axios.create(),
+        httpClient,
         tokenUrl: config.oauth.tokenUrl,
         clientId: config.oauth.clientId,
       },
