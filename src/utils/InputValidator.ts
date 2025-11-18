@@ -193,3 +193,47 @@ export function validateAuth0ClientId(clientId: string): void {
     });
   }
 }
+
+/**
+ * Validate an encryption passphrase.
+ * SECURITY CRITICAL: Protects encrypted credentials!
+ * Passphrases must be:
+ * - Minimum 8 characters
+ * - Maximum 1024 characters
+ * - Not empty or whitespace-only
+ * - Not purely numeric (weak)
+ *
+ * @throws {ValidationError} if validation fails
+ */
+export function validateEncryptionPassphrase(passphrase: string | undefined): void {
+  // Allow undefined (passphrase is optional)
+  if (passphrase === undefined) {
+    return;
+  }
+
+  // Reject empty or whitespace-only
+  if (!passphrase || passphrase.trim().length === 0) {
+    throw new ValidationError('Encryption passphrase cannot be empty');
+  }
+
+  // Enforce minimum length (8 chars)
+  if (passphrase.length < 8) {
+    throw new ValidationError('Encryption passphrase must be at least 8 characters', {
+      length: passphrase.length,
+      minimum: 8,
+    });
+  }
+
+  // Enforce maximum length (1024 chars)
+  if (passphrase.length > 1024) {
+    throw new ValidationError('Encryption passphrase is too long', {
+      length: passphrase.length,
+      maximum: 1024,
+    });
+  }
+
+  // Reject purely numeric passphrases (weak)
+  if (/^\d+$/.test(passphrase)) {
+    throw new ValidationError('Encryption passphrase cannot be purely numeric (too weak)');
+  }
+}

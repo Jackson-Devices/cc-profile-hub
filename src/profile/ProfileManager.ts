@@ -8,6 +8,7 @@ import {
   validatePath,
   validateAuth0Domain,
   validateAuth0ClientId,
+  validateEncryptionPassphrase,
 } from '../utils/InputValidator';
 import { RateLimiter } from '../utils/RateLimiter';
 
@@ -125,6 +126,7 @@ export class ProfileManager {
     validateAuth0Domain(config.auth0Domain);
     validateAuth0ClientId(config.auth0ClientId);
     validatePath(config.tokenStorePath);
+    validateEncryptionPassphrase(config.encryptionPassphrase);
 
     return this.withLock(async () => {
       const storage = await this.loadStorage();
@@ -203,6 +205,10 @@ export class ProfileManager {
     }
     if (updates.tokenStorePath !== undefined) {
       validatePath(updates.tokenStorePath);
+    }
+    // SECURITY FIX (BUG-005): Validate encryptionPassphrase to prevent weak credentials
+    if (updates.encryptionPassphrase !== undefined) {
+      validateEncryptionPassphrase(updates.encryptionPassphrase);
     }
 
     // Rate limiting check (if enabled)
