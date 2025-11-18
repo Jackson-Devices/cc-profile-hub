@@ -86,4 +86,24 @@ describe('BaseError', () => {
 
     expect(error.stack).toContain('Stack message test');
   });
+
+  it('should work when Error.captureStackTrace is not available', () => {
+    // Temporarily remove Error.captureStackTrace (simulates non-V8 engines)
+    const originalCaptureStackTrace = Error.captureStackTrace;
+    // @ts-expect-error - Intentionally deleting for test
+    delete Error.captureStackTrace;
+
+    try {
+      const error = new BaseError('No capture test', 'NO_CAPTURE_ERROR');
+
+      expect(error.message).toBe('No capture test');
+      expect(error.code).toBe('NO_CAPTURE_ERROR');
+      expect(error.name).toBe('BaseError');
+      // Stack should still exist (set by Error constructor)
+      expect(error.stack).toBeDefined();
+    } finally {
+      // Restore
+      Error.captureStackTrace = originalCaptureStackTrace;
+    }
+  });
 });
