@@ -34,8 +34,8 @@ describe('BackupManager', () => {
       // Create some profiles first
       const manager = new ProfileManager(profilesPath);
       await manager.create('test-profile', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'test-client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -48,8 +48,8 @@ describe('BackupManager', () => {
     it('should include profiles in backup', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('profile1', {
-        auth0Domain: 'domain1.auth0.com',
-        auth0ClientId: 'client1',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -77,8 +77,8 @@ describe('BackupManager', () => {
     it('should calculate checksum', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -94,8 +94,8 @@ describe('BackupManager', () => {
     it('should use custom name if provided', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -110,8 +110,8 @@ describe('BackupManager', () => {
       // Create and backup profiles
       const manager1 = new ProfileManager(profilesPath);
       await manager1.create('original-profile', {
-        auth0Domain: 'original.auth0.com',
-        auth0ClientId: 'original-client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -128,14 +128,14 @@ describe('BackupManager', () => {
       const profile = await manager2.read('original-profile');
 
       expect(profile).not.toBeNull();
-      expect(profile?.auth0Domain).toBe('original.auth0.com');
+      expect(profile?.tokenUrl).toBe('https://api.anthropic.com/v1/oauth/token');
     });
 
     it('should validate backup before restoring', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -155,8 +155,8 @@ describe('BackupManager', () => {
     it('should support validate-only mode', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -178,8 +178,8 @@ describe('BackupManager', () => {
     it('should return true for valid backup', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -193,8 +193,8 @@ describe('BackupManager', () => {
     it('should return false for corrupted backup', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -216,8 +216,8 @@ describe('BackupManager', () => {
     it('should list all backup files', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -235,8 +235,8 @@ describe('BackupManager', () => {
     it('should include metadata for each backup', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -263,8 +263,8 @@ describe('BackupManager', () => {
     it('should delete old backups keeping specified count', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 
@@ -286,8 +286,8 @@ describe('BackupManager', () => {
     it('should not delete backups if count is within limit', async () => {
       const manager = new ProfileManager(profilesPath);
       await manager.create('test', {
-        auth0Domain: 'test.auth0.com',
-        auth0ClientId: 'client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 

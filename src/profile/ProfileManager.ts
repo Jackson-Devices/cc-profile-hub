@@ -6,8 +6,8 @@ import { ValidationError } from '../errors/ValidationError';
 import {
   validateProfileId,
   validatePath,
-  validateAuth0Domain,
-  validateAuth0ClientId,
+  validateTokenUrl,
+  validateClientId,
 } from '../utils/InputValidator';
 import { RateLimiter } from '../utils/RateLimiter';
 
@@ -122,8 +122,8 @@ export class ProfileManager {
 
     // Validate all inputs before proceeding
     validateProfileId(profileId);
-    validateAuth0Domain(config.auth0Domain);
-    validateAuth0ClientId(config.auth0ClientId);
+    validateTokenUrl(config.tokenUrl);
+    validateClientId(config.clientId);
     validatePath(config.tokenStorePath);
 
     return this.withLock(async () => {
@@ -148,8 +148,10 @@ export class ProfileManager {
       const now = new Date();
       const profile: ProfileRecord = {
         id: profileId,
-        auth0Domain: config.auth0Domain,
-        auth0ClientId: config.auth0ClientId,
+        tokenUrl: config.tokenUrl,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        scopes: config.scopes || ['user:inference'],
         tokenStorePath: config.tokenStorePath,
         encryptionPassphrase: config.encryptionPassphrase,
         createdAt: now,

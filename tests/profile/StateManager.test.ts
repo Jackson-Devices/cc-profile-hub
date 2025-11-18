@@ -36,8 +36,8 @@ describe('StateManager', () => {
 
     it('should return current active profile ID', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -61,8 +61,8 @@ describe('StateManager', () => {
   describe('getState', () => {
     it('should return complete state', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -83,8 +83,8 @@ describe('StateManager', () => {
   describe('switchTo', () => {
     it('should switch to a valid profile', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -96,8 +96,8 @@ describe('StateManager', () => {
 
     it('should persist state to disk', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -110,8 +110,8 @@ describe('StateManager', () => {
 
     it('should update lastUsedAt in profile', async () => {
       const created = await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -135,14 +135,14 @@ describe('StateManager', () => {
 
     it('should allow switching between profiles', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'work.auth0.com',
-        auth0ClientId: 'work123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
       await profileManager.create('personal', {
-        auth0Domain: 'personal.auth0.com',
-        auth0ClientId: 'personal456',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -157,8 +157,8 @@ describe('StateManager', () => {
 
     it('should update lastSwitchedAt on each switch', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -177,8 +177,8 @@ describe('StateManager', () => {
   describe('clearProfile', () => {
     it('should clear current profile', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -191,8 +191,8 @@ describe('StateManager', () => {
 
     it('should persist cleared state to disk', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -225,8 +225,8 @@ describe('StateManager', () => {
 
     it('should recover from corrupted file on write', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -245,8 +245,8 @@ describe('StateManager', () => {
   describe('atomic operations', () => {
     it('should use atomic write for state persistence', async () => {
       await profileManager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 

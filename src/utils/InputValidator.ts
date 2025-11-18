@@ -134,39 +134,45 @@ export function validatePath(path: string): void {
 }
 
 /**
- * Validate an Auth0 domain.
- * Domains must be:
- * - Valid domain format
+ * Validate an OAuth token URL.
+ * URLs must be:
+ * - Valid HTTPS URL format
  * - Not contain XSS sequences
  * - Not be empty
  *
  * @throws {ValidationError} if validation fails
  */
-export function validateAuth0Domain(domain: string): void {
-  if (!domain || domain.trim().length === 0) {
-    throw new ValidationError('Auth0 domain cannot be empty');
+export function validateTokenUrl(url: string): void {
+  if (!url || url.trim().length === 0) {
+    throw new ValidationError('Token URL cannot be empty');
   }
 
   // Check for XSS attempts
-  if (domain.includes('<') || domain.includes('>') || domain.includes('javascript:')) {
-    throw new ValidationError('Auth0 domain contains invalid characters');
+  if (url.includes('<') || url.includes('>') || url.includes('javascript:')) {
+    throw new ValidationError('Token URL contains invalid characters');
   }
 
-  // Basic domain validation (alphanumeric, dots, hyphens)
-  const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
-  if (!domainPattern.test(domain)) {
-    throw new ValidationError('Auth0 domain format is invalid');
+  // Must be HTTPS (except localhost for testing)
+  if (!url.startsWith('https://') && !url.startsWith('http://localhost') && !url.startsWith('http://127.0.0.1')) {
+    throw new ValidationError('Token URL must use HTTPS');
   }
 
-  if (domain.length > 255) {
-    throw new ValidationError('Auth0 domain is too long', {
-      length: domain.length,
+  // Basic URL validation
+  try {
+    new URL(url);
+  } catch {
+    throw new ValidationError('Token URL format is invalid');
+  }
+
+  if (url.length > 2048) {
+    throw new ValidationError('Token URL is too long', {
+      length: url.length,
     });
   }
 }
 
 /**
- * Validate an Auth0 client ID.
+ * Validate an OAuth client ID.
  * Client IDs must be:
  * - Alphanumeric and certain special characters only
  * - Not empty
@@ -174,20 +180,39 @@ export function validateAuth0Domain(domain: string): void {
  *
  * @throws {ValidationError} if validation fails
  */
-export function validateAuth0ClientId(clientId: string): void {
+export function validateClientId(clientId: string): void {
   if (!clientId || clientId.trim().length === 0) {
-    throw new ValidationError('Auth0 client ID cannot be empty');
+    throw new ValidationError('OAuth client ID cannot be empty');
   }
 
-  // Auth0 client IDs are typically alphanumeric with some special chars
+  // OAuth client IDs are typically alphanumeric with some special chars
+  // Allow hyphens, underscores, and UUIDs (including curly braces)
   const clientIdPattern = /^[a-zA-Z0-9_-]+$/;
   if (!clientIdPattern.test(clientId)) {
-    throw new ValidationError('Auth0 client ID contains invalid characters');
+    throw new ValidationError('OAuth client ID contains invalid characters');
   }
 
-  if (clientId.length > 128) {
-    throw new ValidationError('Auth0 client ID is too long', {
+  if (clientId.length > 256) {
+    throw new ValidationError('OAuth client ID is too long', {
       length: clientId.length,
     });
   }
+}
+
+/**
+ * Validate an Auth0 domain (deprecated - use validateTokenUrl).
+ * @deprecated Use validateTokenUrl instead
+ * @throws {ValidationError} if validation fails
+ */
+export function validateAuth0Domain(domain: string): void {
+  validateTokenUrl(`https://${domain}/oauth/token`);
+}
+
+/**
+ * Validate an Auth0 client ID (deprecated - use validateClientId).
+ * @deprecated Use validateClientId instead
+ * @throws {ValidationError} if validation fails
+ */
+export function validateAuth0ClientId(clientId: string): void {
+  validateClientId(clientId);
 }

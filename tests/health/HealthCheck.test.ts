@@ -58,13 +58,13 @@ describe('HealthCheck', () => {
       // Create some profiles
       const manager = new ProfileManager(profilesPath);
       await manager.create('profile1', {
-        auth0Domain: 'domain1.auth0.com',
-        auth0ClientId: 'client1',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
       await manager.create('profile2', {
-        auth0Domain: 'domain2.auth0.com',
-        auth0ClientId: 'client2',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 

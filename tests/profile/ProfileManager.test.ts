@@ -24,16 +24,16 @@ describe('ProfileManager', () => {
   describe('create', () => {
     it('should create a new profile', async () => {
       const config = {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       };
 
       const profile = await manager.create('work', config);
 
       expect(profile.id).toBe('work');
-      expect(profile.auth0Domain).toBe('company.auth0.com');
-      expect(profile.auth0ClientId).toBe('client123');
+      expect(profile.tokenUrl).toBe('https://api.anthropic.com/v1/oauth/token');
+      expect(profile.clientId).toBe('client123');
       expect(profile.tokenStorePath).toBe('/home/user/.claude/tokens');
       expect(profile.createdAt).toBeInstanceOf(Date);
       expect(profile.updatedAt).toBeInstanceOf(Date);
@@ -42,8 +42,8 @@ describe('ProfileManager', () => {
 
     it('should create profile with encryption passphrase', async () => {
       const config = {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
         encryptionPassphrase: 'secret123',
       };
@@ -55,8 +55,8 @@ describe('ProfileManager', () => {
 
     it('should reject duplicate profile IDs', async () => {
       const config = {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       };
 
@@ -69,8 +69,8 @@ describe('ProfileManager', () => {
 
     it('should persist profile to disk', async () => {
       const config = {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       };
 
@@ -79,15 +79,15 @@ describe('ProfileManager', () => {
       const fileContent = await readFile(profilesPath, 'utf-8');
       const data = JSON.parse(fileContent);
       expect(data.profiles).toHaveProperty('work');
-      expect(data.profiles.work.auth0Domain).toBe('company.auth0.com');
+      expect(data.profiles.work.tokenUrl).toBe('https://api.anthropic.com/v1/oauth/token');
     });
   });
 
   describe('read', () => {
     it('should read an existing profile', async () => {
       const config = {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       };
 
@@ -96,7 +96,7 @@ describe('ProfileManager', () => {
 
       expect(profile).not.toBeNull();
       expect(profile?.id).toBe('work');
-      expect(profile?.auth0Domain).toBe('company.auth0.com');
+      expect(profile?.tokenUrl).toBe('https://api.anthropic.com/v1/oauth/token');
     });
 
     it('should return null for non-existent profile', async () => {
@@ -116,14 +116,14 @@ describe('ProfileManager', () => {
   describe('list', () => {
     it('should list all profiles', async () => {
       await manager.create('work', {
-        auth0Domain: 'work.auth0.com',
-        auth0ClientId: 'work123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'work123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
       await manager.create('personal', {
-        auth0Domain: 'personal.auth0.com',
-        auth0ClientId: 'personal456',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'personal456',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -142,14 +142,14 @@ describe('ProfileManager', () => {
 
     it('should sort profiles by ID alphabetically', async () => {
       await manager.create('zebra', {
-        auth0Domain: 'z.auth0.com',
-        auth0ClientId: 'z123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'z123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
       await manager.create('alpha', {
-        auth0Domain: 'a.auth0.com',
-        auth0ClientId: 'a123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'a123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -163,17 +163,17 @@ describe('ProfileManager', () => {
   describe('update', () => {
     it('should update profile configuration', async () => {
       await manager.create('work', {
-        auth0Domain: 'old.auth0.com',
-        auth0ClientId: 'old123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'old123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
       const updated = await manager.update('work', {
-        auth0Domain: 'new.auth0.com',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
       });
 
-      expect(updated.auth0Domain).toBe('new.auth0.com');
-      expect(updated.auth0ClientId).toBe('old123'); // Unchanged
+      expect(updated.tokenUrl).toBe('https://api.anthropic.com/v1/oauth/token');
+      expect(updated.clientId).toBe('old123'); // Unchanged
       expect(updated.updatedAt.getTime()).toBeGreaterThan(
         updated.createdAt.getTime()
       );
@@ -181,8 +181,8 @@ describe('ProfileManager', () => {
 
     it('should update encryption passphrase', async () => {
       await manager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -195,14 +195,14 @@ describe('ProfileManager', () => {
 
     it('should throw error when updating non-existent profile', async () => {
       await expect(
-        manager.update('nonexistent', { auth0Domain: 'new.auth0.com' })
+        manager.update('nonexistent', { tokenUrl: 'https://api.anthropic.com/v1/oauth/token' })
       ).rejects.toThrow('Profile not found');
     });
 
     it('should preserve createdAt timestamp', async () => {
       const created = await manager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -210,7 +210,7 @@ describe('ProfileManager', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       const updated = await manager.update('work', {
-        auth0Domain: 'new.auth0.com',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
       });
 
       expect(updated.createdAt.getTime()).toBe(created.createdAt.getTime());
@@ -220,8 +220,8 @@ describe('ProfileManager', () => {
   describe('delete', () => {
     it('should delete an existing profile', async () => {
       await manager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -239,8 +239,8 @@ describe('ProfileManager', () => {
 
     it('should persist deletion to disk', async () => {
       await manager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -255,8 +255,8 @@ describe('ProfileManager', () => {
   describe('updateLastUsed', () => {
     it('should update lastUsedAt timestamp', async () => {
       const created = await manager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -283,8 +283,8 @@ describe('ProfileManager', () => {
   describe('exists', () => {
     it('should return true for existing profile', async () => {
       await manager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 
@@ -315,8 +315,8 @@ describe('ProfileManager', () => {
 
       // Should successfully create new profile
       await manager.create('work', {
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
       });
 

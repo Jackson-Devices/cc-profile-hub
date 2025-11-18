@@ -28,8 +28,8 @@ describe('ProfileManager - Concurrent Operations', () => {
     for (let i = 0; i < 10; i++) {
       promises.push(
         manager.create(`profile-${i}`, {
-          auth0Domain: `domain-${i}.auth0.com`,
-          auth0ClientId: `client-${i}`,
+          tokenUrl: `https://domain-${i}.example.com/oauth/token`,
+          clientId: `client-${i}`,
           tokenStorePath: '/home/user/tokens',
         }).then(() => {})
       );
@@ -45,7 +45,7 @@ describe('ProfileManager - Concurrent Operations', () => {
     for (let i = 0; i < 10; i++) {
       const profile = await manager.read(`profile-${i}`);
       expect(profile).not.toBeNull();
-      expect(profile?.auth0Domain).toBe(`domain-${i}.auth0.com`);
+      expect(profile?.tokenUrl).toBe(`https://domain-${i}.example.com/oauth/token`);
     }
   }, 30000);
 
@@ -54,8 +54,8 @@ describe('ProfileManager - Concurrent Operations', () => {
 
     // Create initial profile
     await manager.create('test', {
-      auth0Domain: 'original.auth0.com',
-      auth0ClientId: 'original-client',
+      tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+      clientId: 'test-client-id',
       tokenStorePath: '/home/user/tokens',
     });
 
@@ -64,17 +64,17 @@ describe('ProfileManager - Concurrent Operations', () => {
     for (let i = 0; i < 10; i++) {
       promises.push(
         manager.update('test', {
-          auth0Domain: `domain-${i}.auth0.com`,
+          tokenUrl: `https://domain-${i}.example.com/oauth/token`,
         }).then(() => {})
       );
     }
 
     await Promise.all(promises);
 
-    // Verify profile still exists and has a valid domain
+    // Verify profile still exists and has a valid tokenUrl (one of the concurrent updates won)
     const profile = await manager.read('test');
     expect(profile).not.toBeNull();
-    expect(profile?.auth0Domain).toMatch(/^domain-\d+\.auth0\.com$/);
+    expect(profile?.tokenUrl).toMatch(/^https:\/\/domain-\d+\.example\.com\/oauth\/token$/);
   }, 30000);
 
   it('should handle mixed concurrent creates, updates, and deletes', async () => {
@@ -83,8 +83,8 @@ describe('ProfileManager - Concurrent Operations', () => {
     // Pre-create some profiles
     for (let i = 0; i < 5; i++) {
       await manager.create(`existing-${i}`, {
-        auth0Domain: `domain-${i}.auth0.com`,
-        auth0ClientId: `client-${i}`,
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
     }
@@ -96,8 +96,8 @@ describe('ProfileManager - Concurrent Operations', () => {
       // Creates
       promises.push(
         manager.create(`new-${i}`, {
-          auth0Domain: `new-${i}.auth0.com`,
-          auth0ClientId: `new-client-${i}`,
+          tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+          clientId: 'test-client-id',
           tokenStorePath: '/home/user/tokens',
         }).then(() => {})
       );
@@ -106,7 +106,7 @@ describe('ProfileManager - Concurrent Operations', () => {
       if (i < 5) {
         promises.push(
           manager.update(`existing-${i}`, {
-            auth0Domain: `updated-${i}.auth0.com`,
+            tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
           }).then(() => {}).catch(() => {}) // Ignore errors
         );
       }
@@ -125,7 +125,7 @@ describe('ProfileManager - Concurrent Operations', () => {
     const profiles = await manager.list();
     for (const profile of profiles) {
       expect(profile.id).toBeTruthy();
-      expect(profile.auth0Domain).toBeTruthy();
+      expect(profile.tokenUrl).toBeTruthy();
       expect(profile.createdAt).toBeInstanceOf(Date);
     }
   }, 30000);
@@ -135,8 +135,8 @@ describe('ProfileManager - Concurrent Operations', () => {
 
     // Create initial profile
     await manager.create('counter', {
-      auth0Domain: 'counter.auth0.com',
-      auth0ClientId: 'counter-client',
+      tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+      clientId: 'test-client-id',
       tokenStorePath: '/home/user/tokens',
     });
 
@@ -153,16 +153,16 @@ describe('ProfileManager - Concurrent Operations', () => {
     for (let i = 0; i < 5; i++) {
       promises.push(
         manager.update('counter', {
-          auth0Domain: `counter-${i}.auth0.com`,
+          tokenUrl: `https://counter-${i}.example.com/oauth/token`,
         }).then(() => {})
       );
     }
 
     await Promise.all(promises);
 
-    // Profile should still exist and be valid
+    // Profile should still exist and be valid (with one of the concurrent updates)
     const profile = await manager.read('counter');
     expect(profile).not.toBeNull();
-    expect(profile?.auth0Domain).toMatch(/^counter(-\d+)?\.auth0\.com$/);
+    expect(profile?.tokenUrl).toMatch(/^https:\/\/counter-\d+\.example\.com\/oauth\/token$/);
   }, 30000);
 });

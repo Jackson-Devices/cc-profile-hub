@@ -31,16 +31,16 @@ describe('SECURITY FIX: Path Traversal Prevention', () => {
     // Should REJECT path traversal
     await expect(
       manager.create(maliciousId, {
-        auth0Domain: 'evil.com',
-        auth0ClientId: 'pwned',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/tmp',
       })
     ).rejects.toThrow(ValidationError);
 
     await expect(
       manager.create(maliciousId, {
-        auth0Domain: 'evil.com',
-        auth0ClientId: 'pwned',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/tmp',
       })
     ).rejects.toThrow('Profile ID cannot contain path traversal sequences');
@@ -61,8 +61,8 @@ describe('SECURITY FIX: Path Traversal Prevention', () => {
     for (const id of maliciousIds) {
       await expect(
         manager.create(id, {
-          auth0Domain: 'evil.com',
-          auth0ClientId: 'pwned',
+          tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+          clientId: 'test-client-id',
           tokenStorePath: '/tmp',
         })
       ).rejects.toThrow(ValidationError);
@@ -77,16 +77,16 @@ describe('SECURITY FIX: Path Traversal Prevention', () => {
     for (const name of reservedNames) {
       await expect(
         manager.create(name, {
-          auth0Domain: 'test.com',
-          auth0ClientId: 'test',
+          tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+          clientId: 'test-client-id',
           tokenStorePath: '/tmp',
         })
       ).rejects.toThrow(ValidationError);
 
       await expect(
         manager.create(name, {
-          auth0Domain: 'test.com',
-          auth0ClientId: 'test',
+          tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+          clientId: 'test-client-id',
           tokenStorePath: '/tmp',
         })
       ).rejects.toThrow('Profile ID cannot be a Windows reserved name');
@@ -105,8 +105,8 @@ describe('SECURITY FIX: Path Traversal Prevention', () => {
     for (const path of dangerousPaths) {
       await expect(
         manager.create('valid-id', {
-          auth0Domain: 'test.com',
-          auth0ClientId: 'test',
+          tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+          clientId: 'test-client-id',
           tokenStorePath: path,
         })
       ).rejects.toThrow(ValidationError);
@@ -120,8 +120,8 @@ describe('SECURITY FIX: Path Traversal Prevention', () => {
 
     for (const id of validIds) {
       const profile = await manager.create(id, {
-        auth0Domain: 'test.com',
-        auth0ClientId: 'test-client',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
 

@@ -24,8 +24,8 @@ describe('ProfileManager - Stress Tests', () => {
     // Sequential to avoid "lock file already held" errors under extreme load
     for (let i = 0; i < 1000; i++) {
       await manager.create(`profile-${i}`, {
-        auth0Domain: `domain-${i}.auth0.com`,
-        auth0ClientId: `client-${i}`,
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       });
     }
@@ -37,8 +37,8 @@ describe('ProfileManager - Stress Tests', () => {
     // Try to create one more - should fail
     await expect(
       manager.create('profile-1001', {
-        auth0Domain: 'domain-1001.auth0.com',
-        auth0ClientId: 'client-1001',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'test-client-id',
         tokenStorePath: '/home/user/tokens',
       })
     ).rejects.toThrow('maximum of 1000 profiles reached');
@@ -55,8 +55,8 @@ describe('ProfileManager - Stress Tests', () => {
     for (let i = 0; i < 1100; i++) {
       try {
         await manager.create(`profile-${i}`, {
-          auth0Domain: `domain-${i}.auth0.com`,
-          auth0ClientId: `client-${i}`,
+          tokenUrl: `https://domain-${i}.example.com/oauth/token`,
+          clientId: `client-${i}`,
           tokenStorePath: '/home/user/tokens',
         });
       } catch {
@@ -71,7 +71,7 @@ describe('ProfileManager - Stress Tests', () => {
     // All 1000 profiles should be valid
     for (const profile of profiles) {
       expect(profile.id).toMatch(/^profile-\d+$/);
-      expect(profile.auth0Domain).toMatch(/^domain-\d+\.auth0\.com$/);
+      expect(profile.tokenUrl).toMatch(/^https:\/\/domain-\d+\.example\.com\/oauth\/token$/);
       expect(profile.createdAt).toBeInstanceOf(Date);
     }
   }, 180000); // 3 minutes timeout
@@ -82,8 +82,8 @@ describe('ProfileManager - Stress Tests', () => {
     // Create 100 profiles sequentially (reduced from 500 to fit in timeout)
     for (let i = 0; i < 100; i++) {
       await manager.create(`profile-${i}`, {
-        auth0Domain: `domain-${i}.auth0.com`,
-        auth0ClientId: `client-${i}`,
+        tokenUrl: `https://domain-${i}.example.com/oauth/token`,
+        clientId: `client-${i}`,
         tokenStorePath: '/home/user/tokens',
       });
     }
@@ -103,7 +103,7 @@ describe('ProfileManager - Stress Tests', () => {
         if (opIndex % 3 === 0) {
           mixedPromises.push(
             manager.update(`profile-${opIndex % 100}`, {
-              auth0Domain: `updated-${opIndex}.auth0.com`,
+              tokenUrl: `https://updated-${opIndex}.example.com/oauth/token`,
             }).then(() => {}).catch(() => {}) // Ignore errors
           );
         }
@@ -124,7 +124,7 @@ describe('ProfileManager - Stress Tests', () => {
 
     for (const profile of profiles) {
       expect(profile.id).toMatch(/^profile-\d+$/);
-      expect(profile.auth0Domain).toBeTruthy();
+      expect(profile.tokenUrl).toBeTruthy();
       expect(profile.createdAt).toBeInstanceOf(Date);
       expect(profile.updatedAt).toBeInstanceOf(Date);
     }

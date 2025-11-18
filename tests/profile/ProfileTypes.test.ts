@@ -11,8 +11,11 @@ describe('ProfileTypes', () => {
     it('should validate a complete profile record', () => {
       const record: ProfileRecord = {
         id: 'work',
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        name: 'Work Profile',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
+        clientSecret: 'secret456',
+        scopes: ['user:inference'],
         tokenStorePath: '/home/user/.claude/tokens',
         encryptionPassphrase: 'secret123',
         createdAt: new Date('2025-01-01T00:00:00Z'),
@@ -25,26 +28,31 @@ describe('ProfileTypes', () => {
     });
 
     it('should validate a profile record without optional fields', () => {
-      const record: ProfileRecord = {
+      const record = {
         id: 'personal',
-        auth0Domain: 'personal.auth0.com',
-        auth0ClientId: 'client456',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client456',
         tokenStorePath: '/home/user/.claude/tokens',
         createdAt: new Date('2025-01-01T00:00:00Z'),
         updatedAt: new Date('2025-01-01T00:00:00Z'),
       };
 
       const result = ProfileRecordSchema.parse(record);
-      expect(result).toEqual(record);
+      expect(result.id).toBe('personal');
+      expect(result.tokenUrl).toBe('https://api.anthropic.com/v1/oauth/token');
+      expect(result.clientId).toBe('client456');
+      expect(result.scopes).toEqual(['user:inference']); // Default value
       expect(result.encryptionPassphrase).toBeUndefined();
       expect(result.lastUsedAt).toBeUndefined();
+      expect(result.name).toBeUndefined();
+      expect(result.clientSecret).toBeUndefined();
     });
 
     it('should reject invalid profile IDs', () => {
       const record = {
         id: '', // Empty ID
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -56,8 +64,8 @@ describe('ProfileTypes', () => {
     it('should reject invalid dates', () => {
       const record = {
         id: 'work',
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
         createdAt: 'not-a-date',
         updatedAt: new Date(),
@@ -69,8 +77,8 @@ describe('ProfileTypes', () => {
     it('should convert string dates to Date objects', () => {
       const record = {
         id: 'work',
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
         tokenStorePath: '/home/user/.claude/tokens',
         createdAt: '2025-01-01T00:00:00Z',
         updatedAt: '2025-01-02T00:00:00Z',
@@ -129,8 +137,10 @@ describe('ProfileTypes', () => {
     it('should extract config from profile record', () => {
       const record: ProfileRecord = {
         id: 'work',
-        auth0Domain: 'company.auth0.com',
-        auth0ClientId: 'client123',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client123',
+        clientSecret: 'secret456',
+        scopes: ['user:inference'],
         tokenStorePath: '/home/user/.claude/tokens',
         encryptionPassphrase: 'secret123',
         createdAt: new Date(),
@@ -138,35 +148,39 @@ describe('ProfileTypes', () => {
       };
 
       const config: ProfileConfig = {
-        auth0Domain: record.auth0Domain,
-        auth0ClientId: record.auth0ClientId,
+        tokenUrl: record.tokenUrl,
+        clientId: record.clientId,
+        clientSecret: record.clientSecret,
+        scopes: record.scopes,
         tokenStorePath: record.tokenStorePath,
         encryptionPassphrase: record.encryptionPassphrase,
       };
 
-      expect(config.auth0Domain).toBe('company.auth0.com');
-      expect(config.auth0ClientId).toBe('client123');
+      expect(config.tokenUrl).toBe('https://api.anthropic.com/v1/oauth/token');
+      expect(config.clientId).toBe('client123');
+      expect(config.clientSecret).toBe('secret456');
+      expect(config.scopes).toEqual(['user:inference']);
       expect(config.tokenStorePath).toBe('/home/user/.claude/tokens');
       expect(config.encryptionPassphrase).toBe('secret123');
     });
 
     it('should handle missing optional fields', () => {
-      const record: ProfileRecord = {
+      const inputRecord = {
         id: 'personal',
-        auth0Domain: 'personal.auth0.com',
-        auth0ClientId: 'client456',
+        tokenUrl: 'https://api.anthropic.com/v1/oauth/token',
+        clientId: 'client456',
         tokenStorePath: '/home/user/.claude/tokens',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      const config: ProfileConfig = {
-        auth0Domain: record.auth0Domain,
-        auth0ClientId: record.auth0ClientId,
-        tokenStorePath: record.tokenStorePath,
-      };
-
-      expect(config.encryptionPassphrase).toBeUndefined();
+      // Validate and parse - scopes should get default value
+      const record = ProfileRecordSchema.parse(inputRecord);
+      expect(record.scopes).toEqual(['user:inference']); // Default value applied
+      expect(record.encryptionPassphrase).toBeUndefined();
+      expect(record.clientSecret).toBeUndefined();
+      expect(record.lastUsedAt).toBeUndefined();
+      expect(record.name).toBeUndefined();
     });
   });
 });
