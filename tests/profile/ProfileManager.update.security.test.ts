@@ -354,10 +354,10 @@ describe('ProfileManager.update() Validation Security', () => {
   describe('[BOUNDARY] Edge Cases', () => {
     it('accepts minimum valid passphrase length (8 chars)', async () => {
       const updated = await manager.update('test-profile', {
-        encryptionPassphrase: 'pass1234', // Mixed alphanumeric (not purely numeric)
+        encryptionPassphrase: 'xyzabc99', // Mixed alphanumeric, not common
       });
 
-      expect(updated.encryptionPassphrase).toBe('pass1234');
+      expect(updated.encryptionPassphrase).toBe('xyzabc99');
     });
 
     it('accepts long passphrase (256 chars)', async () => {
