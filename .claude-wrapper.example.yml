@@ -38,3 +38,17 @@ rateLimiting:
   refillRate: 1
   # Interval for refilling tokens in milliseconds (default: 60000 = 1 minute)
   refillInterval: 60000
+
+# Circuit breaker configuration (optional)
+# Provides resilience against cascading failures
+circuitBreaker:
+  # Enable circuit breaker (default: true)
+  enabled: true
+  # Number of consecutive failures before opening circuit (default: 5)
+  failureThreshold: 5
+  # Time in milliseconds to wait before attempting recovery (default: 60000 = 1 minute)
+  resetTimeout: 60000
+  # Number of successful attempts needed to close circuit from half-open (default: 3)
+  halfOpenMaxAttempts: 3
+  # Operation timeout in milliseconds (default: 30000 = 30 seconds)
+  timeout: 30000

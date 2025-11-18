@@ -26,4 +26,8 @@ export class Config {
   get rateLimiting(): ConfigData['rateLimiting'] {
     return this.data.rateLimiting;
   }
+
+  get circuitBreaker(): ConfigData['circuitBreaker'] {
+    return this.data.circuitBreaker;
+  }
 }

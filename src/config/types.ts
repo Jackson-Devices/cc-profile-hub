@@ -29,6 +29,22 @@ export const ConfigSchema = z.object({
       refillRate: 1,
       refillInterval: 60000,
     })),
+  circuitBreaker: z
+    .object({
+      enabled: z.boolean().default(true),
+      failureThreshold: z.number().min(1).default(5),
+      resetTimeout: z.number().min(1000).default(60000),
+      halfOpenMaxAttempts: z.number().min(1).default(3),
+      timeout: z.number().min(1000).default(30000),
+    })
+    .optional()
+    .default(() => ({
+      enabled: true,
+      failureThreshold: 5,
+      resetTimeout: 60000,
+      halfOpenMaxAttempts: 3,
+      timeout: 30000,
+    })),
 });
 
 export type ConfigData = z.infer<typeof ConfigSchema>;

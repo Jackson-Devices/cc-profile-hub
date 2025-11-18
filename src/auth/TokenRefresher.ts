@@ -6,11 +6,13 @@ import { MetricsCollector } from './MetricsCollector';
 import { AuthError } from '../errors/AuthError';
 import { NetworkError } from '../errors/NetworkError';
 import { RateLimiter } from '../utils/RateLimiter';
+import { CircuitBreaker } from '../utils/CircuitBreaker';
 
 export interface TokenRefresherOptions {
   retryPolicy?: Partial<RetryPolicy>;
   metricsCollector?: MetricsCollector;
   rateLimiter?: RateLimiter;
+  circuitBreaker?: CircuitBreaker;
 }
 
 /**
@@ -23,6 +25,7 @@ export interface TokenRefresherOptions {
  * - Optional metrics collection for monitoring and debugging
  * - Profile-based tracking for multi-profile scenarios
  * - Optional rate limiting to prevent OAuth endpoint abuse
+ * - Optional circuit breaker for resilience against cascading failures
  *
  * Token Rotation:
  * OAuth 2.0 servers may rotate refresh tokens for security. This class
@@ -50,11 +53,13 @@ export class TokenRefresher {
   private retryPolicy: RetryPolicy;
   private metricsCollector?: MetricsCollector;
   private rateLimiter?: RateLimiter;
+  private circuitBreaker?: CircuitBreaker;
 
   constructor(private config: RefreshConfig, options?: TokenRefresherOptions) {
     this.retryPolicy = { ...DEFAULT_RETRY_POLICY, ...options?.retryPolicy };
     this.metricsCollector = options?.metricsCollector;
     this.rateLimiter = options?.rateLimiter;
+    this.circuitBreaker = options?.circuitBreaker;
   }
 
   async refresh(refreshToken: string, scopes: string[], profileId: string = 'default'): Promise<TokenData> {
@@ -71,6 +76,18 @@ export class TokenRefresher {
       }
     }
 
+    // If circuit breaker is configured, wrap the refresh operation
+    if (this.circuitBreaker) {
+      return await this.circuitBreaker.execute(() =>
+        this.executeRefresh(refreshToken, scopes, profileId)
+      );
+    }
+
+    // No circuit breaker - execute directly
+    return await this.executeRefresh(refreshToken, scopes, profileId);
+  }
+
+  private async executeRefresh(refreshToken: string, scopes: string[], profileId: string): Promise<TokenData> {
     const startTime = Date.now();
     let attempt = 0;
     let lastError: any;

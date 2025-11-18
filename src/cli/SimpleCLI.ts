@@ -5,6 +5,7 @@ import { ConfigLoader } from '../config/ConfigLoader';
 import { Logger } from '../utils/Logger';
 import { ClaudeWrapper } from '../wrapper/ClaudeWrapper';
 import { RateLimiter } from '../utils/RateLimiter';
+import { CircuitBreaker } from '../utils/CircuitBreaker';
 import { homedir } from 'os';
 import { join } from 'path';
 import axios from 'axios';
@@ -166,6 +167,16 @@ export class SimpleCLI {
         })
       : undefined;
 
+    // Create circuit breaker if enabled
+    const circuitBreaker = config.circuitBreaker?.enabled
+      ? new CircuitBreaker({
+          failureThreshold: config.circuitBreaker.failureThreshold,
+          resetTimeout: config.circuitBreaker.resetTimeout,
+          halfOpenMaxAttempts: config.circuitBreaker.halfOpenMaxAttempts,
+          timeout: config.circuitBreaker.timeout,
+        })
+      : undefined;
+
     const refresher = new TokenRefresher(
       {
         httpClient: axios.create(),
@@ -175,6 +186,7 @@ export class SimpleCLI {
       {
         metricsCollector,
         rateLimiter,
+        circuitBreaker,
       }
     );
 
