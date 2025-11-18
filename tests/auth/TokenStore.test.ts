@@ -1,8 +1,10 @@
 import { TokenStore } from '../../src/auth/TokenStore';
 import { TokenData } from '../../src/auth/TokenData';
+import { TokenError } from '../../src/errors/TokenError';
 import { mkdirSync, writeFileSync, rmSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import * as atomicWriteModule from '../../src/utils/atomicWrite';
 
 describe('TokenStore Read', () => {
   let tempDir: string;
@@ -167,5 +169,63 @@ describe('TokenStore Write', () => {
       // On Windows, just verify the file exists and is readable
       expect(stats.isFile()).toBe(true);
     }
+  });
+
+  it('should throw TokenError when permission verification fails', async () => {
+    const profileId = 'permission-error-test';
+    const tokenData: TokenData = {
+      accessToken: 'test-access',
+      refreshToken: 'test-refresh',
+      expiresAt: Date.now() + 3600000,
+      grantedAt: Date.now(),
+      scopes: ['user:inference'],
+      tokenType: 'Bearer',
+      deviceFingerprint: 'device-123',
+    };
+
+    // Mock atomicWrite to throw permission verification error
+    jest.spyOn(atomicWriteModule, 'atomicWrite').mockRejectedValue(
+      new Error('File permissions verification failed: expected 0600, got 0644')
+    );
+
+    try {
+      await store.write(profileId, tokenData);
+      fail('Should have thrown a TokenError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TokenError);
+      expect((error as Error).message).toContain('permissions verification failed');
+    }
+
+    // Restore original
+    jest.restoreAllMocks();
+  });
+
+  it('should rethrow non-permission errors', async () => {
+    const profileId = 'generic-error-test';
+    const tokenData: TokenData = {
+      accessToken: 'test-access',
+      refreshToken: 'test-refresh',
+      expiresAt: Date.now() + 3600000,
+      grantedAt: Date.now(),
+      scopes: ['user:inference'],
+      tokenType: 'Bearer',
+      deviceFingerprint: 'device-123',
+    };
+
+    // Mock atomicWrite to throw a generic error
+    jest.spyOn(atomicWriteModule, 'atomicWrite').mockRejectedValue(
+      new Error('Disk full')
+    );
+
+    try {
+      await store.write(profileId, tokenData);
+      fail('Should have thrown an error');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(TokenError);
+      expect((error as Error).message).toBe('Disk full');
+    }
+
+    jest.restoreAllMocks();
   });
 });
