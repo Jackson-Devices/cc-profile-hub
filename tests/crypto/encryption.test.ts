@@ -45,4 +45,17 @@ describe('AES-GCM Encryption', () => {
 
     expect(decrypted).toBe(unicode);
   });
+
+  it('should handle non-Error exceptions during decryption', async () => {
+    // Create invalid base64 to trigger a string error from Buffer.from
+    const invalidBase64 = 'not-valid-base64-!@#$%';
+
+    try {
+      await decrypt(invalidBase64, passphrase);
+      fail('Should have thrown an error');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain('Decryption failed');
+    }
+  });
 });
