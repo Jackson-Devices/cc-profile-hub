@@ -43,6 +43,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "axios": "^1.13.2",
     "commander": "^14.0.2",
     "js-yaml": "^4.1.1",
