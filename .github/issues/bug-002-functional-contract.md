@@ -273,10 +273,52 @@ it('[BOUNDARY] handles construction with minimal options', () => {
 
 ---
 
+## Test Design Expansion (STATE 1)
+
+### Test Suite Structure
+
+**File**: `tests/health/HealthCheck.encapsulation.test.ts`
+**Total Tests Planned**: 6 core tests
+
+**Test Organization**:
+```
+describe('HealthCheck Encapsulation')
+  describe('[IB-1] Property Initialization')
+    - Test 1: Stores profilesPath in own property
+    - Test 2: Stores tokenStorePath in own property
+  describe('[IB-2] File System Health Check')
+    - Test 3: Uses own profilesPath, not ProfileManager's
+  describe('[IB-3] Encapsulation')
+    - Test 4: Maintains separation from ProfileManager
+  describe('[REGRESSION] No Private Access')
+    - Test 5: Does not access profileManager private properties
+  describe('[BOUNDARY] Edge Cases')
+    - Test 6: Handles minimal constructor options
+```
+
+### Implementation Strategy
+
+**Mocking Approach**:
+- Mock `fs/promises` for filesystem operations
+- Use actual HealthCheck class (no mocking)
+- Access private properties via bracket notation for verification
+
+**Assertion Strategy**:
+- Verify property values with `toBe()` for exact matches
+- Verify property existence with `hasOwnProperty()`
+- Verify method execution with `toBeDefined()` checks
+
+**Coverage Goals**:
+- 100% of constructor initialization
+- 100% of property access paths
+- TypeScript compilation verification
+
+---
+
 ## STATE Transition Log
 
-- **STATE 0**: 🔄 IN PROGRESS - Functional contract definition (this document)
-- **STATE 1**: ⏳ Pending - Test design
+- **STATE 0**: ✅ Complete - Functional contract defined (commit: 61f4543)
+- **STATE 1**: 🔄 IN PROGRESS - Test designs expanded (this update)
 - **STATE 2**: ⏳ Pending - Test implementation
 - **STATE 3**: ⏳ Pending - Test validation
 - **STATE 4**: ⏳ Pending - RED phase
@@ -286,4 +328,4 @@ it('[BOUNDARY] handles construction with minimal options', () => {
 
 ---
 
-**Next Action**: Complete STATE 0 documentation, commit, proceed to STATE 1
+**Next Action**: Commit STATE 1, proceed to STATE 2 (Test Implementation)
