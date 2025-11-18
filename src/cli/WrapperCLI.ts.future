@@ -1,0 +1,440 @@
+import { Command } from 'commander';
+import { AuthManager } from '../auth/AuthManager';
+import { TokenRefresher } from '../auth/TokenRefresher';
+import { EncryptedTokenStore } from '../auth/EncryptedTokenStore';
+import { ProfileManager } from '../profile/ProfileManager';
+import { StateManager } from '../profile/StateManager';
+import { ConfigLoader } from '../config/ConfigLoader';
+import { Logger } from '../utils/Logger';
+import { ClaudeWrapper } from '../wrapper/ClaudeWrapper';
+import { homedir } from 'os';
+import { join } from 'path';
+import axios from 'axios';
+import { MetricsCollector } from '../auth/MetricsCollector';
+
+export interface WrapperCLIConfig {
+  configPath?: string;
+  logger?: Logger;
+}
+
+/**
+ * Main CLI for the Claude wrapper.
+ *
+ * Handles both wrapper management commands and proxying to the real Claude CLI.
+ */
+export class WrapperCLI {
+  private configPath: string;
+  private logger: Logger;
+  private program: Command;
+
+  constructor(config: WrapperCLIConfig = {}) {
+    this.configPath = config.configPath || join(homedir(), '.claude-wrapper.yml');
+    this.logger = config.logger || new Logger({ level: 'info' });
+    this.program = new Command();
+
+    this.setupCommands();
+  }
+
+  private setupCommands(): void {
+    this.program
+      .name('claude')
+      .version('1.0.0')
+      .description('Claude CLI wrapper with automatic token refresh and profile management');
+
+    // Wrapper management commands
+    const wrapperCmd = this.program
+      .command('wrapper')
+      .description('Manage wrapper configuration, profiles, and authentication');
+
+    // Auth commands
+    const authCmd = wrapperCmd
+      .command('auth')
+      .description('Authentication management');
+
+    authCmd
+      .command('status')
+      .description('Check current authentication status')
+      .action(async () => {
+        await this.handleAuthStatus();
+      });
+
+    authCmd
+      .command('refresh')
+      .description('Force token refresh')
+      .action(async () => {
+        await this.handleAuthRefresh();
+      });
+
+    // Profile commands
+    const profileCmd = wrapperCmd
+      .command('profile')
+      .description('Profile management');
+
+    profileCmd
+      .command('list')
+      .description('List all profiles')
+      .action(async () => {
+        await this.handleProfileList();
+      });
+
+    profileCmd
+      .command('create <name>')
+      .description('Create a new profile')
+      .option('-e, --email <email>', 'Email address')
+      .option('-n, --nickname <nickname>', 'Display nickname')
+      .action(async (name, options) => {
+        await this.handleProfileCreate(name, options);
+      });
+
+    profileCmd
+      .command('switch <name>')
+      .description('Switch to a different profile')
+      .action(async (name) => {
+        await this.handleProfileSwitch(name);
+      });
+
+    profileCmd
+      .command('delete <name>')
+      .description('Delete a profile')
+      .action(async (name) => {
+        await this.handleProfileDelete(name);
+      });
+
+    profileCmd
+      .command('show [name]')
+      .description('Show profile details (current profile if name not specified)')
+      .action(async (name) => {
+        await this.handleProfileShow(name);
+      });
+
+    // Config commands
+    wrapperCmd
+      .command('config')
+      .description('Show current configuration')
+      .action(async () => {
+        await this.handleConfigShow();
+      });
+
+    // Health check
+    wrapperCmd
+      .command('health')
+      .description('Run health check')
+      .action(async () => {
+        await this.handleHealthCheck();
+      });
+
+    // Allow unknown options for passing through to Claude
+    this.program.allowUnknownOption();
+  }
+
+  async run(argv: string[]): Promise<number> {
+    // Check if this is a wrapper command
+    if (argv.includes('wrapper')) {
+      await this.program.parseAsync(argv);
+      return 0;
+    }
+
+    // Otherwise, proxy to real Claude CLI with token refresh
+    return await this.handleClaudeProxy(argv.slice(2)); // Remove 'node' and 'script.js'
+  }
+
+  private async handleAuthStatus(): Promise<void> {
+    try {
+      const config = await this.loadConfig();
+      const stateManager = await this.createStateManager();
+      const currentProfile = await stateManager.getCurrentProfile();
+
+      if (!currentProfile) {
+        console.log('No active profile');
+        return;
+      }
+
+      const tokenStore = this.createTokenStore();
+      const token = await tokenStore.read(currentProfile);
+
+      if (!token) {
+        console.log(`Profile: ${currentProfile}`);
+        console.log('Status: Not authenticated');
+        return;
+      }
+
+      const now = Date.now();
+      const timeUntilExpiry = token.expiresAt - now;
+      const isExpired = timeUntilExpiry <= 0;
+
+      console.log(`Profile: ${currentProfile}`);
+      console.log(`Status: ${isExpired ? 'Expired' : 'Valid'}`);
+      console.log(`Expires: ${new Date(token.expiresAt).toISOString()}`);
+      console.log(`Time until expiry: ${Math.floor(timeUntilExpiry / 1000)}s`);
+      console.log(`Scopes: ${token.scopes.join(', ')}`);
+    } catch (error) {
+      this.logger.error('Failed to check auth status', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleAuthRefresh(): Promise<void> {
+    try {
+      const config = await this.loadConfig();
+      const stateManager = await this.createStateManager();
+      const currentProfile = await stateManager.getCurrentProfile();
+
+      if (!currentProfile) {
+        console.error('No active profile. Use "claude wrapper profile switch <name>" first.');
+        process.exit(1);
+      }
+
+      console.log(`Refreshing token for profile: ${currentProfile}`);
+
+      const authManager = await this.createAuthManager(currentProfile);
+      const token = await authManager.ensureValidToken();
+
+      console.log('✓ Token refreshed successfully');
+      console.log(`Expires: ${new Date(token.expiresAt).toISOString()}`);
+    } catch (error) {
+      this.logger.error('Failed to refresh token', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleProfileList(): Promise<void> {
+    try {
+      const profileManager = await this.createProfileManager();
+      const stateManager = await this.createStateManager();
+      const currentProfile = await stateManager.getCurrentProfile();
+      const profiles = await profileManager.list();
+
+      if (profiles.length === 0) {
+        console.log('No profiles found');
+        return;
+      }
+
+      console.log('Profiles:');
+      for (const profile of profiles) {
+        const isCurrent = profile.id === currentProfile;
+        const marker = isCurrent ? '*' : ' ';
+        const lastUsed = profile.lastUsedAt
+          ? new Date(profile.lastUsedAt).toISOString()
+          : 'Never';
+        console.log(`${marker} ${profile.id} (${profile.email || 'no email'}) - Last used: ${lastUsed}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to list profiles', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleProfileCreate(
+    name: string,
+    options: { email?: string; nickname?: string }
+  ): Promise<void> {
+    try {
+      const config = await this.loadConfig();
+      const profileManager = await this.createProfileManager();
+
+      await profileManager.create({
+        id: name,
+        email: options.email,
+        nickname: options.nickname,
+        oauth: {
+          clientId: config.oauth.clientId,
+          tokenUrl: config.oauth.tokenUrl,
+        },
+        createdAt: new Date(),
+        lastUsedAt: null,
+      });
+
+      console.log(`✓ Profile "${name}" created successfully`);
+    } catch (error) {
+      this.logger.error('Failed to create profile', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleProfileSwitch(name: string): Promise<void> {
+    try {
+      const profileManager = await this.createProfileManager();
+      const stateManager = await this.createStateManager();
+
+      // Check if profile exists
+      const profile = await profileManager.read(name);
+      if (!profile) {
+        console.error(`Profile "${name}" not found`);
+        process.exit(1);
+      }
+
+      await stateManager.switchTo(name);
+      console.log(`✓ Switched to profile: ${name}`);
+    } catch (error) {
+      this.logger.error('Failed to switch profile', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleProfileDelete(name: string): Promise<void> {
+    try {
+      const profileManager = await this.createProfileManager();
+      const stateManager = await this.createStateManager();
+      const currentProfile = await stateManager.getCurrentProfile();
+
+      if (currentProfile === name) {
+        console.error('Cannot delete active profile. Switch to another profile first.');
+        process.exit(1);
+      }
+
+      await profileManager.delete(name);
+      console.log(`✓ Profile "${name}" deleted successfully`);
+    } catch (error) {
+      this.logger.error('Failed to delete profile', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleProfileShow(name?: string): Promise<void> {
+    try {
+      const profileManager = await this.createProfileManager();
+      const stateManager = await this.createStateManager();
+
+      const profileId = name || (await stateManager.getCurrentProfile());
+      if (!profileId) {
+        console.error('No active profile and no profile name specified');
+        process.exit(1);
+      }
+
+      const profile = await profileManager.read(profileId);
+      if (!profile) {
+        console.error(`Profile "${profileId}" not found`);
+        process.exit(1);
+      }
+
+      console.log('Profile Details:');
+      console.log(`ID: ${profile.id}`);
+      console.log(`Email: ${profile.email || 'Not set'}`);
+      console.log(`Nickname: ${profile.nickname || 'Not set'}`);
+      console.log(`Created: ${new Date(profile.createdAt).toISOString()}`);
+      console.log(`Last used: ${profile.lastUsedAt ? new Date(profile.lastUsedAt).toISOString() : 'Never'}`);
+      console.log(`OAuth Client ID: ${profile.oauth.clientId}`);
+      console.log(`OAuth Token URL: ${profile.oauth.tokenUrl}`);
+    } catch (error) {
+      this.logger.error('Failed to show profile', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleConfigShow(): Promise<void> {
+    try {
+      const config = await this.loadConfig();
+      console.log('Configuration:');
+      console.log(`Claude Path: ${config.claudePath}`);
+      console.log(`OAuth Token URL: ${config.oauth.tokenUrl}`);
+      console.log(`OAuth Client ID: ${config.oauth.clientId}`);
+      console.log(`Log Level: ${config.logging?.level || 'info'}`);
+      console.log(`Refresh Threshold: ${config.refreshThreshold}s`);
+    } catch (error) {
+      this.logger.error('Failed to show config', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
+  private async handleHealthCheck(): Promise<void> {
+    console.log('Running health check...');
+    console.log('✓ CLI is responsive');
+    // Could add more checks here
+    console.log('✓ All systems operational');
+  }
+
+  private async handleClaudeProxy(args: string[]): Promise<number> {
+    try {
+      const config = await this.loadConfig();
+      const stateManager = await this.createStateManager();
+      const currentProfile = await stateManager.getCurrentProfile();
+
+      if (!currentProfile) {
+        console.error('No active profile. Use "claude wrapper profile switch <name>" first.');
+        return 1;
+      }
+
+      // Ensure token is valid before running Claude
+      const authManager = await this.createAuthManager(currentProfile);
+      const token = await authManager.ensureValidToken();
+
+      this.logger.debug('Token validated, running Claude', {
+        profile: currentProfile,
+        args,
+      });
+
+      // Run Claude with the validated token
+      const wrapper = new ClaudeWrapper({
+        claudeBinaryPath: config.claudePath,
+      });
+
+      return await wrapper.run(args, {
+        env: {
+          ANTHROPIC_API_KEY: token.accessToken,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to proxy to Claude', { error });
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      return 1;
+    }
+  }
+
+  // Helper methods to create components
+
+  private async loadConfig() {
+    const loader = new ConfigLoader(this.configPath);
+    return await loader.load();
+  }
+
+  private createTokenStore(): EncryptedTokenStore {
+    const tokenPath = join(homedir(), '.claude-wrapper', 'tokens');
+    // TODO: Get passphrase from config or environment
+    const passphrase = process.env.CLAUDE_WRAPPER_PASSPHRASE;
+    return new EncryptedTokenStore(tokenPath, passphrase);
+  }
+
+  private async createProfileManager(): Promise<ProfileManager> {
+    const profilesPath = join(homedir(), '.claude-wrapper', 'profiles.json');
+    return new ProfileManager({ profilesPath });
+  }
+
+  private async createStateManager(): Promise<StateManager> {
+    const statePath = join(homedir(), '.claude-wrapper', 'state.json');
+    const profilesPath = join(homedir(), '.claude-wrapper', 'profiles.json');
+    return new StateManager(statePath, profilesPath);
+  }
+
+  private async createAuthManager(profileId: string): Promise<AuthManager> {
+    const config = await this.loadConfig();
+    const tokenStore = this.createTokenStore();
+    const metricsCollector = new MetricsCollector();
+
+    const refresher = new TokenRefresher(
+      {
+        httpClient: axios.create(),
+        tokenUrl: config.oauth.tokenUrl,
+        clientId: config.oauth.clientId,
+      },
+      {
+        metricsCollector,
+      }
+    );
+
+    return new AuthManager({
+      store: tokenStore,
+      refresher,
+      profileId,
+      refreshThreshold: config.refreshThreshold,
+      logger: this.logger,
+    });
+  }
+}

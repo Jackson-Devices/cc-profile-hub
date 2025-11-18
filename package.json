@@ -2,7 +2,10 @@
   "name": "cc-profile-hub",
   "version": "1.0.0",
   "description": "account switcher for Claude Code CLI",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "bin": {
+    "claude-wrapper": "dist/index.js"
+  },
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",

@@ -1,0 +1,28 @@
+# Claude Wrapper Configuration Example
+# Copy this file to ~/.claude-wrapper.yml and customize
+
+# Path to the real Claude CLI binary (renamed to claude-original during installation)
+claudePath: /usr/local/bin/claude-original
+
+# OAuth configuration
+oauth:
+  # Anthropic OAuth token endpoint
+  tokenUrl: https://api.anthropic.com/v1/oauth/token
+  # Anthropic Console OAuth Client ID
+  clientId: 9d1c250a-e61b-44d9-88ed-5944d1962f5e
+  # OAuth scopes (optional, defaults to user:inference)
+  scopes:
+    - user:inference
+
+# Logging configuration (optional)
+logging:
+  # Log level: trace, debug, info, warn, error
+  level: info
+  # Automatically redact sensitive tokens from logs
+  redactTokens: true
+  # Optional: log to file instead of stdout
+  # file: ~/.claude-wrapper/logs/wrapper.log
+
+# Refresh threshold: refresh tokens this many seconds before expiry (default: 300)
+# This ensures your token is always fresh
+refreshThreshold: 300
