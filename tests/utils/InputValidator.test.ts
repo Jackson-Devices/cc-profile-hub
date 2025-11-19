@@ -1,4 +1,11 @@
-import { validateProfileId, validatePath } from '../../src/utils/InputValidator';
+import {
+  validateProfileId,
+  validatePath,
+  validateTokenUrl,
+  validateClientId,
+  validateAuth0Domain,
+  validateAuth0ClientId,
+} from '../../src/utils/InputValidator';
 import { ValidationError } from '../../src/errors/ValidationError';
 
 describe('InputValidator - Profile ID', () => {
@@ -112,5 +119,87 @@ describe('InputValidator - Paths', () => {
     it('should reject empty paths', () => {
       expect(() => validatePath('')).toThrow(ValidationError);
     });
+  });
+});
+
+describe('InputValidator - Token URL', () => {
+  describe('valid token URLs', () => {
+    it('should accept HTTPS URLs', () => {
+      expect(() => validateTokenUrl('https://api.example.com/oauth/token')).not.toThrow();
+      expect(() => validateTokenUrl('https://auth.anthropic.com/v1/oauth/token')).not.toThrow();
+    });
+
+    it('should accept localhost HTTP URLs for testing', () => {
+      expect(() => validateTokenUrl('http://localhost:3000/oauth/token')).not.toThrow();
+      expect(() => validateTokenUrl('http://127.0.0.1:8080/token')).not.toThrow();
+    });
+  });
+
+  describe('invalid token URLs', () => {
+    it('should reject empty URLs', () => {
+      expect(() => validateTokenUrl('')).toThrow(ValidationError);
+      expect(() => validateTokenUrl('   ')).toThrow('Token URL cannot be empty');
+    });
+
+    it('should reject non-HTTPS URLs (except localhost)', () => {
+      expect(() => validateTokenUrl('http://api.example.com/token')).toThrow(ValidationError);
+      expect(() => validateTokenUrl('http://api.example.com/token')).toThrow('must use HTTPS');
+    });
+
+    it('should reject XSS attempts', () => {
+      expect(() => validateTokenUrl('https://example.com/<script>')).toThrow(ValidationError);
+      expect(() => validateTokenUrl('https://example.com/>alert')).toThrow('invalid characters');
+      expect(() => validateTokenUrl('javascript:alert(1)')).toThrow(ValidationError);
+    });
+
+    it('should reject invalid URL format', () => {
+      expect(() => validateTokenUrl('https://[invalid')).toThrow(ValidationError);
+      expect(() => validateTokenUrl('https://[invalid')).toThrow('format is invalid');
+    });
+
+    it('should reject URLs that are too long', () => {
+      const longUrl = 'https://example.com/' + 'a'.repeat(2040);
+      expect(() => validateTokenUrl(longUrl)).toThrow(ValidationError);
+      expect(() => validateTokenUrl(longUrl)).toThrow('too long');
+    });
+  });
+});
+
+describe('InputValidator - Client ID', () => {
+  describe('valid client IDs', () => {
+    it('should accept alphanumeric client IDs', () => {
+      expect(() => validateClientId('abc123')).not.toThrow();
+      expect(() => validateClientId('client-id-123')).not.toThrow();
+      expect(() => validateClientId('client_id_456')).not.toThrow();
+    });
+  });
+
+  describe('invalid client IDs', () => {
+    it('should reject empty client IDs', () => {
+      expect(() => validateClientId('')).toThrow(ValidationError);
+      expect(() => validateClientId('   ')).toThrow('cannot be empty');
+    });
+
+    it('should reject client IDs with invalid characters', () => {
+      expect(() => validateClientId('client@id')).toThrow(ValidationError);
+      expect(() => validateClientId('client#id')).toThrow('invalid characters');
+      expect(() => validateClientId('client id')).toThrow(ValidationError);
+    });
+
+    it('should reject client IDs that are too long', () => {
+      const longId = 'a'.repeat(257);
+      expect(() => validateClientId(longId)).toThrow(ValidationError);
+      expect(() => validateClientId(longId)).toThrow('too long');
+    });
+  });
+});
+
+describe('InputValidator - Deprecated Auth0 Functions', () => {
+  it('should validate Auth0 domain via validateAuth0Domain', () => {
+    expect(() => validateAuth0Domain('example.auth0.com')).not.toThrow();
+  });
+
+  it('should validate Auth0 client ID via validateAuth0ClientId', () => {
+    expect(() => validateAuth0ClientId('test-client-123')).not.toThrow();
   });
 });
