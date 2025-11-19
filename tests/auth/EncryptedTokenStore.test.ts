@@ -106,6 +106,30 @@ describe('EncryptedTokenStore', () => {
 
     expect(result).toEqual(tokenData);
   });
+
+  it('should read plain token file when using encrypted store', async () => {
+    // Write a plain (unencrypted) token file
+    const unencryptedStore = new EncryptedTokenStore(tempDir);
+    const profileId = 'plain-to-encrypted';
+    const tokenData: TokenData = {
+      accessToken: 'plain-access',
+      refreshToken: 'plain-refresh',
+      expiresAt: Date.now() + 3600000,
+      grantedAt: Date.now(),
+      scopes: ['user:inference'],
+      tokenType: 'Bearer',
+      deviceFingerprint: 'device-123',
+    };
+
+    await unencryptedStore.write(profileId, tokenData);
+
+    // Now try to read it with an encrypted store (with passphrase)
+    const encryptedStore = new EncryptedTokenStore(tempDir, passphrase);
+    const result = await encryptedStore.read(profileId);
+
+    // Should successfully read the plain token
+    expect(result).toEqual(tokenData);
+  });
 });
 
 describe('EncryptedTokenStore Corruption Recovery', () => {
