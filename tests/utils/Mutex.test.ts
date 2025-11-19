@@ -195,5 +195,22 @@ describe('Mutex', () => {
 
       expect(result).toBe('sync-result');
     });
+
+    it('should support disabling timeout with timeoutMs: 0', async () => {
+      const mutexNoTimeout = new Mutex({ timeoutMs: 0 });
+      const release1 = await mutexNoTimeout.acquire();
+
+      // Queue a second acquisition (will wait indefinitely with no timeout)
+      const promise2 = mutexNoTimeout.acquire();
+
+      // Release first lock
+      release1();
+
+      // Second acquisition should complete (no timeout error)
+      const release2 = await promise2;
+      expect(release2).toBeInstanceOf(Function);
+
+      release2();
+    });
   });
 });
